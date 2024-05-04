@@ -70,6 +70,67 @@ export class GameManager {
           game.makeMove(socket, message.payload.move);
         }
       }
+
+      if (message.type === JOIN_GAME) {
+        if (message.payload?.gameId) {
+          const {
+            payload: { gameId },
+          } = message;
+          const availableGame = this.games.find(
+            (game) => game.gameId === gameId
+          );
+          if (availableGame) {
+            const { player1, player2, gameId, board } = availableGame;
+            if (player1 && player2) {
+              socket.send(JSON.stringify({ type: "GAME_FULL" }));
+            }
+            if (!player1) {
+              availableGame.player1 = socket;
+              player2?.send(JSON.stringify({ type: "OPPONENT_JOINED" }));
+            } else if (!player2) {
+              availableGame.player2 = socket;
+              player1.send(JSON.stringify({ type: "OPPONENT_JOINED" }));
+            }
+            socket.send(
+              JSON.stringify({
+                type: "GAME_JOINED",
+                payload: {
+                  gameId,
+                  board,
+                },
+              })
+            );
+            return;
+          } else {
+            const gameFromDb = await prisma.game.findUnique({
+              where: {
+                id: gameId,
+              },
+              include: {
+                moves: {
+                  orderBy: {
+                    moveNumber: "asc",
+                  },
+                },
+              },
+            });
+            const game = new Game(socket, null);
+            gameFromDb?.moves.forEach((move) => {
+              game.board.move(move);
+            });
+            this.games.push(game);
+            socket.send(
+              JSON.stringify({
+                type: "GAME_JOINED",
+                payload: {
+                  gameId,
+                  board: game.board,
+                },
+              })
+            );
+          }
+        }
+      }
     });
   }
 }

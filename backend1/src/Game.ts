@@ -10,8 +10,14 @@ export class Game {
   public board: Chess;
   private startTime: Date;
   private moveCount = 0;
+  private failedDbMoves: {
+    moveNumber: number;
+    from: string;
+    to: string;
+    playedAt: Date;
+  }[] = [];
 
-  constructor(player1: WebSocket, player2: WebSocket) {
+  constructor(player1: WebSocket, player2: WebSocket | null) {
     this.player1 = player1;
     this.player2 = player2;
     this.board = new Chess();
@@ -62,7 +68,29 @@ export class Game {
     } catch (error) {}
   }
 
-  makeMove(socket: WebSocket, move: { from: string; to: string }) {
+  async addMoveToDb(move: { from: string; to: string }) {
+    if (this.gameId) {
+      try {
+        await prisma.move.create({
+          data: {
+            gameId: this.gameId,
+            moveNumber: this.moveCount + 1,
+            from: move.from,
+            to: move.to,
+          },
+        });
+      } catch (error) {
+        this.failedDbMoves.push({
+          moveNumber: this.moveCount + 1,
+          from: move.from,
+          to: move.to,
+          playedAt: new Date(Date.now()),
+        });
+      }
+    }
+  }
+
+  async makeMove(socket: WebSocket, move: { from: string; to: string }) {
     // Validate type of move using zod
 
     // Validation (is it this players turn, is the move valid)
@@ -76,49 +104,74 @@ export class Game {
     try {
       this.board.move(move);
     } catch (error) {
+      console.log(error);
       return;
     }
 
+    // add move to db
+    await this.addMoveToDb(move);
+
     // Check if the game is over
     if (this.board.isGameOver()) {
-      this.player1.send(
-        JSON.stringify({
-          type: GAME_OVER,
-          payload: {
-            winner: this.board.turn() === "w" ? "black" : "white",
-          },
-        })
-      );
-      this.player2.send(
-        JSON.stringify({
-          type: GAME_OVER,
-          payload: {
-            winner: this.board.turn() === "w" ? "black" : "white",
-          },
-        })
-      );
+      if (this.player1) {
+        this.player1.send(
+          JSON.stringify({
+            type: GAME_OVER,
+            payload: {
+              winner: this.board.turn() === "w" ? "black" : "white",
+            },
+          })
+        );
+      }
+      if (this.player2) {
+        this.player2.send(
+          JSON.stringify({
+            type: GAME_OVER,
+            payload: {
+              winner: this.board.turn() === "w" ? "black" : "white",
+            },
+          })
+        );
+      }
+
+      if (this.failedDbMoves.length > 0 && this.gameId) {
+        try {
+          await prisma.move.createMany({
+            data: this.failedDbMoves.map((move) => ({
+              gameId: this.gameId!,
+              ...move,
+            })),
+          });
+        } catch (error) {
+          console.error("Couldn't add games to the database", error);
+        }
+      }
       return;
     }
 
     // Send the update
     if (this.moveCount % 2 === 0) {
-      this.player2.send(
-        JSON.stringify({
-          type: MOVE,
-          payload: {
-            move,
-          },
-        })
-      );
+      if (this.player2) {
+        this.player2.send(
+          JSON.stringify({
+            type: MOVE,
+            payload: {
+              move,
+            },
+          })
+        );
+      }
     } else {
-      this.player1.send(
-        JSON.stringify({
-          type: MOVE,
-          payload: {
-            move,
-          },
-        })
-      );
+      if (this.player1) {
+        this.player1.send(
+          JSON.stringify({
+            type: MOVE,
+            payload: {
+              move,
+            },
+          })
+        );
+      }
     }
     this.moveCount++;
   }
