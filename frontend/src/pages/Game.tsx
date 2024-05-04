@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Button from "../Components/Button";
 import ChessBoard from "../Components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
@@ -11,7 +11,8 @@ export const GAME_OVER = "game_over";
 
 const Game = () => {
   const socket = useSocket();
-  const [board, setBoard] = useState(new Chess());
+  const [chess, setChess] = useState(new Chess());
+  const [board, setBoard] = useState(chess.board());
 
   useEffect(() => {
     if (!socket) {
@@ -23,9 +24,13 @@ const Game = () => {
       console.log(message);
       switch (message.type) {
         case INIT_GAME:
+          setChess(new Chess());
+          setBoard(chess.board());
           console.log("Game initialized");
           break;
         case MOVE:
+          chess.move(message.payload);
+          setBoard(chess.board());
           console.log("Move made");
           break;
         case GAME_OVER:
@@ -39,11 +44,11 @@ const Game = () => {
   return (
     <div className="flex justify-center">
       <div className="pt-8 max-w-screen-lg">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <ChessBoard />
+        <div className="grid grid-cols-6 gap-4 w-full">
+          <div className="col-span-4 w-full flex justify-center">
+            <ChessBoard board={board} />
           </div>
-          <div>
+          <div className="col-span-2 bg-gray-600 rounded flex justify-center items-center">
             <Button
               onClick={() => {
                 socket.send(

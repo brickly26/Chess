@@ -1,4 +1,3 @@
-import { useState } from "react";
 import "./App.css";
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
@@ -7,7 +6,7 @@ import Game from "./Pages/Game";
 
 function App() {
   return (
-    <div className="h-screen bg-gray-700">
+    <div className="h-screen bg-gray-800">
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
