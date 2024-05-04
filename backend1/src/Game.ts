@@ -1,10 +1,12 @@
 import WebSocket from "ws";
 import { Chess } from "chess.js";
 import { GAME_OVER, INIT_GAME, MOVE } from "./messages";
+import prisma from "./db";
 
 export class Game {
-  public player1: WebSocket;
-  public player2: WebSocket;
+  public gameId: string | null = null;
+  public player1: WebSocket | null;
+  public player2: WebSocket | null;
   public board: Chess;
   private startTime: Date;
   private moveCount = 0;
@@ -14,22 +16,50 @@ export class Game {
     this.player2 = player2;
     this.board = new Chess();
     this.startTime = new Date();
-    this.player1.send(
-      JSON.stringify({
-        type: INIT_GAME,
-        payload: {
-          color: "white",
+  }
+
+  async createGameHandler() {
+    await this.createGameInDb();
+    if (this.player1) {
+      this.player1.send(
+        JSON.stringify({
+          type: INIT_GAME,
+          payload: {
+            color: "white",
+          },
+        })
+      );
+    }
+    if (this.player2) {
+      this.player2.send(
+        JSON.stringify({
+          type: INIT_GAME,
+          payload: {
+            color: "black",
+          },
+        })
+      );
+    }
+  }
+
+  async createGameInDb() {
+    try {
+      const game = await prisma.game.create({
+        data: {
+          playerWhite: {
+            create: {},
+          },
+          playerBlack: {
+            create: {},
+          },
         },
-      })
-    );
-    this.player2.send(
-      JSON.stringify({
-        type: INIT_GAME,
-        payload: {
-          color: "black",
+        include: {
+          playerWhite: true,
+          playerBlack: true,
         },
-      })
-    );
+      });
+      this.gameId = game.id;
+    } catch (error) {}
   }
 
   makeMove(socket: WebSocket, move: { from: string; to: string }) {
