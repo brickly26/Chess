@@ -20,8 +20,9 @@ const Landing = () => {
             <p className="text-lg mt-2 text-white">
               Play chess with your friends
             </p>
-            <div className="mt-4">
+            <div className="mt-8 flex space-x-5 justify-center">
               <Button onClick={() => router("/game")}>Play</Button>
+              <Button onClick={() => router("/login")}>Login</Button>
             </div>
           </div>
         </div>
