@@ -1,4 +1,9 @@
+import { useNavigate } from "react-router-dom";
+import Button from "../Components/Button";
+
 const Landing = () => {
+  const router = useNavigate();
+
   return (
     <div className="flex justify-center">
       <div className="pt-8 max-w-screen-lg">
@@ -16,9 +21,7 @@ const Landing = () => {
               Play chess with your friends
             </p>
             <div className="mt-4">
-              <button className="bg-[#B48764] text-2xl hover:bg-[#bf9b80] text-white font-bold py-4 px-8 rounded">
-                Play
-              </button>
+              <Button onClick={() => router("/game")}>Play</Button>
             </div>
           </div>
         </div>

@@ -2,8 +2,8 @@ import { useState } from "react";
 import "./App.css";
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import Landing from "./pages/Landing";
-import Game from "./pages/Game";
+import Landing from "./Pages/Landing";
+import Game from "./Pages/Game";
 
 function App() {
   return (
