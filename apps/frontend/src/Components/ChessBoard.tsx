@@ -31,23 +31,13 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
 }) => {
   const [from, setFrom] = useState<null | Square>(null);
   const [to, setTo] = useState<null | Square>(null);
-  let displayBoard = board;
-
-  if (color === "black") {
-    displayBoard = board.reverse();
-  }
 
   return (
     <div>
-      {displayBoard.map((row, i) => {
-        let displayRow = row;
-        if (color === "black") {
-          displayRow = row.reverse();
-        }
-
+      {board.map((row, i) => {
         return (
           <div key={i} className="flex">
-            {displayRow.map((square, j) => {
+            {row.map((square, j) => {
               const squareCoord = (String.fromCharCode(97 + (j % 8)) +
                 "" +
                 (8 - i)) as Square;

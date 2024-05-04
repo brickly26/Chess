@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import { Chess } from "chess.js";
 import { GAME_OVER, INIT_GAME, MOVE } from "./messages";
-import prisma from "./db";
+import prisma from "@repo/db";
 
 export class Game {
   public gameId: string | null = null;

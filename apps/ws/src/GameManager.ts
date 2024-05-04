@@ -2,7 +2,7 @@ import { WebSocket } from "ws";
 import { INIT_GAME, MOVE, JOIN_GAME } from "./messages";
 import { Game } from "./Game";
 
-import prisma from "./db";
+import prisma from "@repo/db";
 
 export class GameManager {
   private games: Game[];
@@ -115,7 +115,7 @@ export class GameManager {
               },
             });
             const game = new Game(socket, null);
-            gameFromDb?.moves.forEach((move) => {
+            gameFromDb?.moves.forEach((move: { from: string; to: string }) => {
               game.board.move(move);
             });
             this.games.push(game);
