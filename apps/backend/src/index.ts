@@ -4,6 +4,9 @@ const cors = require("cors");
 const passport = require("passprt");
 import dotenv from "dotenv";
 
+import authRoute from "./router/auth";
+import v1Router from "./router/v1";
+
 const app = express();
 
 dotenv.config();
@@ -27,8 +30,8 @@ app.use(
   })
 );
 
-// app.use("/auth", authRoute);
-// app.use("/v1", v1Router);
+app.use("/auth", authRoute);
+app.use("/v1", v1Router);
 
 const PORT = process.env.PORT || 5173;
 app.listen(PORT, () => {
