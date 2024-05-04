@@ -51,12 +51,13 @@ model Move {
   game            Game        @relation(fields: [gameId], references: [id])
   gameId          String
   moveNumber      Int
-  notation        String
+  from            String
+  to              String
   comments        String?
   startFen        String
   endFen          String
   timeTaken       Int?        @default(0)
-  playedAt        DateTime    @default(now())
+  createdAt        DateTime    @default(now())
 
   @@index([gameId])
 }

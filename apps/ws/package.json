@@ -6,15 +6,17 @@
   "scripts": {
     "build": "tsc -b",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon src/index.js"
+    "start": "nodemon src/index.js",
+    "dev": "esbuild ./src/index.ts --bundle --platform=node --outfile=dist/index.js --sourcemap && node dist/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@repo/db": "*",
     "@prisma/client": "^5.13.0",
+    "@repo/db": "*",
     "chess.js": "^1.0.0-beta.8",
+    "jsonwebtoken": "^9.0.2",
     "ws": "^8.17.0"
   },
   "devDependencies": {

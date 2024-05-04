@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import ChessBoard from "../Components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
 import { Chess } from "chess.js";
+import { useNavigate, useParams } from "react-router-dom";
 
 // TODO: Move together, there's code repetition here
 export const INIT_GAME = "init_game";
@@ -10,6 +11,11 @@ export const GAME_OVER = "game_over";
 
 const Game = () => {
   const socket = useSocket();
+  const { gameId } = useParams();
+
+  const router = useNavigate();
+
+  // Todo move to store/context
   const [chess, setChess] = useState(new Chess());
   const [board, setBoard] = useState(chess.board());
   const [started, setStarted] = useState(false);
@@ -27,13 +33,11 @@ const Game = () => {
         case INIT_GAME:
           setBoard(chess.board());
           setStarted(true);
-          setColor(message.payload.color);
-          console.log("Game initialized");
+          router(`/game/${message.payload.gameId}`);
           break;
         case MOVE:
           chess.move(message.payload.move);
           setBoard(chess.board());
-          console.log("Move made");
           break;
         case GAME_OVER:
           console.log("Game over");
@@ -57,20 +61,21 @@ const Game = () => {
             />
           </div>
           <div className="col-span-2 bg-gray-600 rounded flex justify-center items-center">
-            <button
-              disabled={started}
-              className="bg-[#B48764] text-2xl hover:bg-[#bf9b80] text-white font-bold py-4 w-full mx-4 rounded"
-              onClick={() => {
-                setStarted(true);
-                socket.send(
-                  JSON.stringify({
-                    type: INIT_GAME,
-                  })
-                );
-              }}
-            >
-              Play
-            </button>
+            {!started && gameId === "random" && (
+              <button
+                className="bg-[#B48764] text-2xl hover:bg-[#bf9b80] text-white font-bold py-4 w-full mx-4 rounded"
+                onClick={() => {
+                  setStarted(true);
+                  socket.send(
+                    JSON.stringify({
+                      type: INIT_GAME,
+                    })
+                  );
+                }}
+              >
+                Play
+              </button>
+            )}
           </div>
         </div>
       </div>

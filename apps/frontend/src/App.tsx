@@ -1,5 +1,5 @@
 import "./App.css";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense } from "react";
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Landing from "./Pages/Landing";
@@ -7,7 +7,7 @@ import Game from "./Pages/Game";
 import Login from "./Pages/Login";
 import { RecoilRoot } from "recoil";
 import { useUser } from "@repo/store/useUser";
-import { Loader } from "./components/Loader";
+import { Loader } from "./Components/Loader";
 
 function App() {
   return (

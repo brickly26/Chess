@@ -1,33 +1,38 @@
 import WebSocket from "ws";
 import { Chess } from "chess.js";
 import { GAME_OVER, INIT_GAME, MOVE } from "./messages";
-import prisma from "@repo/db/src/index";
+import { prisma } from "./db";
+import { randomUUID } from "crypto";
 
 export class Game {
-  public gameId: string | null = null;
-  public player1: WebSocket | null;
-  public player2: WebSocket | null;
+  public gameId: string;
+  public player1: { id: string; socket: WebSocket };
+  public player2: { id: string; socket: WebSocket };
   public board: Chess;
   private startTime: Date;
   private moveCount = 0;
-  private failedDbMoves: {
-    moveNumber: number;
-    from: string;
-    to: string;
-    playedAt: Date;
-  }[] = [];
 
-  constructor(player1: WebSocket, player2: WebSocket | null) {
+  constructor(
+    player1: { id: string; socket: WebSocket },
+    player2: { id: string; socket: WebSocket }
+  ) {
     this.player1 = player1;
     this.player2 = player2;
     this.board = new Chess();
     this.startTime = new Date();
+    this.gameId = randomUUID();
   }
 
   async createGameHandler() {
-    await this.createGameInDb();
+    try {
+      await this.createGameInDb();
+    } catch (error) {
+      console.error(error);
+      return;
+    }
+
     if (this.player1) {
-      this.player1.send(
+      this.player1.socket.send(
         JSON.stringify({
           type: INIT_GAME,
           payload: {
@@ -37,7 +42,7 @@ export class Game {
       );
     }
     if (this.player2) {
-      this.player2.send(
+      this.player2.socket.send(
         JSON.stringify({
           type: INIT_GAME,
           payload: {
@@ -49,55 +54,64 @@ export class Game {
   }
 
   async createGameInDb() {
-    try {
-      const game = await prisma.game.create({
-        data: {
-          whitePlayer: {
-            create: {},
-          },
-          playerBlack: {
-            create: {},
+    const game = await prisma.game.create({
+      data: {
+        id: this.gameId,
+        timeControl: "CLASSICAL",
+        status: "IN_PROGRESS",
+        currentFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        whitePlayer: {
+          connect: {
+            id: this.player1.id,
           },
         },
-        include: {
-          whitePlayer: true,
-          blackPlayer: true,
+        blackPlayer: {
+          connect: {
+            id: this.player2.id,
+          },
         },
-      });
-      this.gameId = game.id;
-    } catch (error) {}
+      },
+      include: {
+        whitePlayer: true,
+        blackPlayer: true,
+      },
+    });
+    this.gameId = game.id;
   }
 
   async addMoveToDb(move: { from: string; to: string }) {
-    if (this.gameId) {
-      try {
-        await prisma.move.create({
-          data: {
-            gameId: this.gameId,
-            moveNumber: this.moveCount + 1,
-            from: move.from,
-            to: move.to,
-          },
-        });
-      } catch (error) {
-        this.failedDbMoves.push({
+    await prisma.$transaction([
+      prisma.move.create({
+        data: {
+          gameId: this.gameId,
           moveNumber: this.moveCount + 1,
           from: move.from,
           to: move.to,
-          playedAt: new Date(Date.now()),
-        });
-      }
-    }
+          // Todo: Fix start fen
+          startFen: this.board.fen(),
+          endFen: this.board.fen(),
+          createdAt: new Date(Date.now()),
+        },
+      }),
+      prisma.game.update({
+        where: {
+          id: this.gameId,
+        },
+        data: {
+          currentFen: this.board.fen(),
+        },
+      }),
+    ]);
   }
 
   async makeMove(socket: WebSocket, move: { from: string; to: string }) {
     // Validate type of move using zod
 
     // Validation (is it this players turn, is the move valid)
-    if (this.moveCount % 2 === 0 && socket !== this.player1) {
+    if (this.moveCount % 2 === 0 && socket !== this.player1.socket) {
       return;
     }
-    if (this.moveCount % 2 === 1 && socket !== this.player2) {
+    if (this.moveCount % 2 === 1 && socket !== this.player2.socket) {
       return;
     }
 
@@ -114,7 +128,7 @@ export class Game {
     // Check if the game is over
     if (this.board.isGameOver()) {
       if (this.player1) {
-        this.player1.send(
+        this.player1.socket.send(
           JSON.stringify({
             type: GAME_OVER,
             payload: {
@@ -124,7 +138,7 @@ export class Game {
         );
       }
       if (this.player2) {
-        this.player2.send(
+        this.player2.socket.send(
           JSON.stringify({
             type: GAME_OVER,
             payload: {
@@ -133,26 +147,12 @@ export class Game {
           })
         );
       }
-
-      if (this.failedDbMoves.length > 0 && this.gameId) {
-        try {
-          await prisma.move.createMany({
-            data: this.failedDbMoves.map((move) => ({
-              gameId: this.gameId!,
-              ...move,
-            })),
-          });
-        } catch (error) {
-          console.error("Couldn't add games to the database", error);
-        }
-      }
-      return;
     }
 
     // Send the update
     if (this.moveCount % 2 === 0) {
       if (this.player2) {
-        this.player2.send(
+        this.player2.socket.send(
           JSON.stringify({
             type: MOVE,
             payload: {
@@ -163,7 +163,7 @@ export class Game {
       }
     } else {
       if (this.player1) {
-        this.player1.send(
+        this.player1.socket.send(
           JSON.stringify({
             type: MOVE,
             payload: {

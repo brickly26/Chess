@@ -55,9 +55,9 @@ const Login = () => {
           />
           <button
             className="bg-[#B48764] text-white w-full py-2 rounded-md hover:bg-[#bf9b80] transition-colors duration-300"
-            onClick={() => router("/game")}
+            onClick={() => router("/game/random")}
           >
-            Play
+            Enter as guest
           </button>
         </div>
       </div>
