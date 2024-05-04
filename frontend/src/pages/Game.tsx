@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import Button from "../Components/Button";
 import ChessBoard from "../Components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
 import { Chess } from "chess.js";
@@ -13,6 +12,8 @@ const Game = () => {
   const socket = useSocket();
   const [chess, setChess] = useState(new Chess());
   const [board, setBoard] = useState(chess.board());
+  const [started, setStarted] = useState(false);
+  const [color, setColor] = useState(null);
 
   useEffect(() => {
     if (!socket) {
@@ -24,12 +25,13 @@ const Game = () => {
       console.log(message);
       switch (message.type) {
         case INIT_GAME:
-          setChess(new Chess());
           setBoard(chess.board());
+          setStarted(true);
+          setColor(message.payload.color);
           console.log("Game initialized");
           break;
         case MOVE:
-          chess.move(message.payload);
+          chess.move(message.payload.move);
           setBoard(chess.board());
           console.log("Move made");
           break;
@@ -46,11 +48,20 @@ const Game = () => {
       <div className="pt-8 max-w-screen-lg">
         <div className="grid grid-cols-6 gap-4 w-full">
           <div className="col-span-4 w-full flex justify-center">
-            <ChessBoard board={board} />
+            <ChessBoard
+              color={color}
+              socket={socket}
+              board={board}
+              setBoard={setBoard}
+              chess={chess}
+            />
           </div>
           <div className="col-span-2 bg-gray-600 rounded flex justify-center items-center">
-            <Button
+            <button
+              disabled={started}
+              className="bg-[#B48764] text-2xl hover:bg-[#bf9b80] text-white font-bold py-4 w-full mx-4 rounded"
               onClick={() => {
+                setStarted(true);
                 socket.send(
                   JSON.stringify({
                     type: INIT_GAME,
@@ -59,7 +70,7 @@ const Game = () => {
               }}
             >
               Play
-            </Button>
+            </button>
           </div>
         </div>
       </div>

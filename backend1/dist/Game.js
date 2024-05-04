@@ -55,17 +55,20 @@ class Game {
             return;
         }
         // Send the update
-        console.log(this.moveCount);
         if (this.moveCount % 2 === 0) {
             this.player2.send(JSON.stringify({
                 type: messages_1.MOVE,
-                payload: move,
+                payload: {
+                    move,
+                },
             }));
         }
         else {
             this.player1.send(JSON.stringify({
                 type: messages_1.MOVE,
-                payload: move,
+                payload: {
+                    move,
+                },
             }));
         }
         this.moveCount++;
