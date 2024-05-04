@@ -2,7 +2,7 @@ import { WebSocket } from "ws";
 import { INIT_GAME, MOVE, JOIN_GAME } from "./messages";
 import { Game } from "./Game";
 
-import prisma from "@repo/db";
+import prisma from "@repo/db/src/index";
 
 export class GameManager {
   private games: Game[];

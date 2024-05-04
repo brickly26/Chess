@@ -1,16 +1,17 @@
 import { PrismaClient } from "@prisma/client";
 
-const prismaClientGenerator = () => {
+const prismaClientSingleton = () => {
   return new PrismaClient();
 };
 
-type prismaClientGenerator = ReturnType<typeof prismaClientGenerator>;
+type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
 
+// eslint-disable-next-line
 const globalForPrisma = globalThis as unknown as {
-  prisma: prismaClientGenerator | undefined;
+  prisma: PrismaClientSingleton | undefined;
 };
 
-const prisma = globalForPrisma.prisma ?? prismaClientGenerator();
+const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
 
 export default prisma;
 

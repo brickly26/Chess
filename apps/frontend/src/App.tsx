@@ -7,31 +7,34 @@ import Game from "./Pages/Game";
 import Login from "./Pages/Login";
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   useEffect(() => {
-    const getUser = () => {
-      fetch("http://localhost:5173/auth/login/success", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Credentials": "true",
-        },
-      })
-        .then((response) => {
-          if (response.status === 200) return response.json();
-          throw new Error("authentication has been failed!");
-        })
-        .then((resObject) => {
-          setUser(resObject.user);
-        })
-        .catch((err) => {
-          console.log(err);
-        });
+    const fetchToken = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:3000/auth/login/refresh",
+          {
+            method: "GET",
+            credentials: "include",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (response.ok) {
+          setIsAuthenticated(true);
+          localStorage.setItem("token", (await response.json()).token);
+        } else {
+          throw new Error("Authentication failed");
+        }
+      } catch (error) {
+        console.log(error);
+      }
     };
-    getUser();
+    fetchToken();
   }, []);
 
   return (
@@ -39,8 +42,14 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/game" element={<Game />} />
+          <Route
+            path="/login"
+            element={isAuthenticated ? <Game /> : <Login />}
+          />
+          <Route
+            path="/game"
+            element={isAuthenticated ? <Game /> : <Login />}
+          />
         </Routes>
       </BrowserRouter>
     </div>

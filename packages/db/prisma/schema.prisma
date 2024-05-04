@@ -10,30 +10,77 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Game {
-  id                  String      @id @default(cuid())
-  playerWhite         User        @relation("PlayerWhite", fields: [playerWhiteId], references: [id])   
-  playerWhiteId       String
-  playerBlack         User        @relation("PlayerBlack", fields: [playerBlackId], references: [id])   
-  playerBlackId       String
-  createdAt           DateTime    @default(now())
-  moves               Move[]
+model User {
+  id              String          @id @default(uuid())
+  username        String          @unique
+  name            String?
+  email           String?         @unique
+  provider        AuthProvider
+  password        String?
+  rating          Int             @default(1200)
+  gamesAsWhite    Game[]          @relation("GamesAsWhite")
+  gamesAsBlack    Game[]          @relation("GamesAsBlack")
+  createdAt       DateTime        @default(now())
+  lastLogin       DateTime?       
+
+  @@index([rating])
 }
 
-model User {
-  id              String      @id @default(cuid())
-  name            String?
-  email           String?     @unique
-  gamesAsWhite    Game[]      @relation("PlayerWhite")
-  gamesAsBlack    Game[]      @relation("PlayerBlack")
+model Game {
+  id                  String        @id @default(uuid())
+  whitePlayer         User          @relation("GamesAsWhite", fields: [whitePlayerId], references: [id])   
+  whitePlayerId       String
+  blackPlayer         User          @relation("GamesAsBlack", fields: [blackPlayerId], references: [id])   
+  blackPlayerId       String
+  status              GameStatus
+  result              GameResult?
+  timeControl         TimeControl
+  startingFen         String        @default("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+  currentFen          String?
+  startAt             DateTime      @default(now())
+  endAt               DateTime?
+  moves               Move[]
+  opening             String?
+  event               String?
+
+  @@index([status, result])
 }
 
 model Move {
-  id              String      @id @default(cuid())
+  id              String      @id @default(uuid())
   game            Game        @relation(fields: [gameId], references: [id])
   gameId          String
   moveNumber      Int
-  from            String
-  to              String
+  notation        String
+  comments        String?
+  startFen        String
+  endFen          String
+  timeTaken       Int?        @default(0)
   playedAt        DateTime    @default(now())
+
+  @@index([gameId])
+}
+
+enum GameStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+enum GameResult {
+  WHITE_WINS
+  BLACK_WINS
+  DRAW
+}
+enum TimeControl {
+  CLASSICAL
+  RAPID
+  BLITZ
+  BULLET
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  FACEBOOK
+  GITHUB
 }

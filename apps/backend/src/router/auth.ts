@@ -1,32 +1,51 @@
-const router = require("express").Router();
-import { Response } from "express";
+import { Response, Request, Router } from "express";
 const passport = require("passport");
+import jwt from "jsonwebtoken";
+const router = Router();
 
 const CLIENT_URL = "http://localhost:5173/game";
+const JWT_SECRET = process.env.JWT_SECRET || "your_secret_key";
 
-router.get("/login/success", (req: { user: any }, res: Response) => {
+interface User {
+  _id: string;
+}
+
+router.get("/login/refresh", (req: Request, res: Response) => {
   if (req.user) {
-    res.status(200).json({
-      success: true,
-      message: "successful",
-      user: req.user,
-    });
+    const user = req.user as User;
+
+    // Token is issued so it can be shared b/w HTTP and ws server
+    // Todo: Make this temporary and add refresh logic here
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET);
+    res.json({ token });
+  } else {
+    res.status(401).json({ success: false, message: "Unauthroized" });
   }
 });
 
-router.get("/login/failed", (req: any, res: Response) => {
+router.get("/login/failed", (req: Request, res: Response) => {
   res.status(401).json({
     success: false,
     message: "failure",
   });
 });
 
-router.get("/logout", (req: { logout: () => void }, res: Response) => {
-  req.logout();
-  res.redirect("http://localhost:5173/");
+router.get("/logout", (req: Request, res: Response) => {
+  req.logout((err) => {
+    if (err) {
+      console.log("Error loggin out:", err);
+      res.status(500).json({ error: "Failed to log out" });
+    } else {
+      res.clearCookie("jwt");
+      res.redirect("http://localhost:5173/");
+    }
+  });
 });
 
-router.get("/google", passport.authenticate("google", { scope: ["profile"] }));
+router.get(
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"] })
+);
 
 router.get(
   "/google/callback",
@@ -36,7 +55,10 @@ router.get(
   })
 );
 
-router.get("/github", passport.authenticate("github", { scope: ["profile"] }));
+router.get(
+  "/github",
+  passport.authenticate("github", { scope: ["profile", "email"] })
+);
 
 router.get(
   "/github/callback",

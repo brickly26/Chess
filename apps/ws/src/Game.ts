@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import { Chess } from "chess.js";
 import { GAME_OVER, INIT_GAME, MOVE } from "./messages";
-import prisma from "@repo/db";
+import prisma from "@repo/db/src/index";
 
 export class Game {
   public gameId: string | null = null;
@@ -52,7 +52,7 @@ export class Game {
     try {
       const game = await prisma.game.create({
         data: {
-          playerWhite: {
+          whitePlayer: {
             create: {},
           },
           playerBlack: {
@@ -60,8 +60,8 @@ export class Game {
           },
         },
         include: {
-          playerWhite: true,
-          playerBlack: true,
+          whitePlayer: true,
+          blackPlayer: true,
         },
       });
       this.gameId = game.id;

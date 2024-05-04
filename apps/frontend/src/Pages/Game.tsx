@@ -39,7 +39,7 @@ const Game = () => {
           console.log("Game over");
       }
     };
-  }, [socket]);
+  }, [socket, chess]);
 
   if (!socket) return <div>Connecting...</div>;
 
