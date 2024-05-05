@@ -22,7 +22,7 @@ export class GameManager {
 
   addUser(user: SocketWithId) {
     this.users.push(user);
-    this.addHandler(user.socket);
+    this.addHandler(user);
   }
 
   removeUser(socket: WebSocket, userId: string) {
@@ -35,7 +35,7 @@ export class GameManager {
     if (gameIndex !== -1) {
       const game = this.games[gameIndex];
       if (game.player1.socket === socket) {
-        game.player1 = null;
+        // game.player1 = null;
         if (game.player2) {
           game.player2.socket.send(
             JSON.stringify({ type: OPPONENT_DISCONNECTED })
@@ -44,7 +44,7 @@ export class GameManager {
           this.games.splice(gameIndex, 1);
         }
       } else if (game.player2.socket === socket) {
-        game.player2 = null;
+        // game.player2 = null;
         if (game.player1) {
           game.player1.socket.send(
             JSON.stringify({ type: OPPONENT_DISCONNECTED })
@@ -94,11 +94,11 @@ export class GameManager {
               socket.send(JSON.stringify({ type: "GAME_FULL" }));
             }
             if (!player1) {
-              availableGame.player1 = socket;
-              player2?.send(JSON.stringify({ type: "OPPONENT_JOINED" }));
+              availableGame.player1.socket = socket;
+              player2.socket?.send(JSON.stringify({ type: "OPPONENT_JOINED" }));
             } else if (!player2) {
-              availableGame.player2 = socket;
-              player1.send(JSON.stringify({ type: "OPPONENT_JOINED" }));
+              availableGame.player2.socket = socket;
+              player1.socket.send(JSON.stringify({ type: "OPPONENT_JOINED" }));
             }
             socket.send(
               JSON.stringify({
@@ -123,7 +123,10 @@ export class GameManager {
                 },
               },
             });
-            const game = new Game(socket, null);
+            const game = new Game(
+              { socket, id: gameFromDb?.whitePlayerId! },
+              { socket, id: gameFromDb?.blackPlayerId! }
+            );
             gameFromDb?.moves.forEach((move: { from: string; to: string }) => {
               game.board.move(move);
             });

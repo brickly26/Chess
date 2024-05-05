@@ -31,22 +31,45 @@ export class Game {
       return;
     }
 
+    const users = await prisma.user.findMany({
+      where: {
+        id: {
+          in: [this.player1.id, this.player2.id],
+        },
+      },
+    });
+
     if (this.player1) {
       this.player1.socket.send(
         JSON.stringify({
           type: INIT_GAME,
           payload: {
             color: "white",
+            gameId: this.gameId,
+            whitePlayer: users.find((user) => user.id === this.player1.id)
+              ?.name,
+            blackPlayer: users.find((user) => user.id === this.player2.id)
+              ?.name,
+            fen: this.board.fen(),
+            moves: [],
           },
         })
       );
     }
+
     if (this.player2) {
       this.player2.socket.send(
         JSON.stringify({
           type: INIT_GAME,
           payload: {
             color: "black",
+            gameId: this.gameId,
+            whitePlayer: users.find((user) => user.id === this.player1.id)
+              ?.name,
+            blackPlayer: users.find((user) => user.id === this.player2.id)
+              ?.name,
+            fen: this.board.fen(),
+            moves: [],
           },
         })
       );
@@ -105,8 +128,6 @@ export class Game {
   }
 
   async makeMove(socket: WebSocket, move: { from: string; to: string }) {
-    // Validate type of move using zod
-
     // Validation (is it this players turn, is the move valid)
     if (this.moveCount % 2 === 0 && socket !== this.player1.socket) {
       return;
@@ -124,30 +145,6 @@ export class Game {
 
     // add move to db
     await this.addMoveToDb(move);
-
-    // Check if the game is over
-    if (this.board.isGameOver()) {
-      if (this.player1) {
-        this.player1.socket.send(
-          JSON.stringify({
-            type: GAME_OVER,
-            payload: {
-              winner: this.board.turn() === "w" ? "black" : "white",
-            },
-          })
-        );
-      }
-      if (this.player2) {
-        this.player2.socket.send(
-          JSON.stringify({
-            type: GAME_OVER,
-            payload: {
-              winner: this.board.turn() === "w" ? "black" : "white",
-            },
-          })
-        );
-      }
-    }
 
     // Send the update
     if (this.moveCount % 2 === 0) {
@@ -173,6 +170,44 @@ export class Game {
         );
       }
     }
+
+    // Check if the game is over
+    if (this.board.isGameOver()) {
+      const result = this.board.isDraw()
+        ? "DRAW"
+        : this.board.turn() === "b"
+          ? "WHITE_WINS"
+          : "BLACK_WINS";
+
+      this.player1.socket.send(
+        JSON.stringify({
+          type: GAME_OVER,
+          payload: {
+            result,
+          },
+        })
+      );
+
+      this.player2.socket.send(
+        JSON.stringify({
+          type: GAME_OVER,
+          payload: {
+            result,
+          },
+        })
+      );
+
+      await prisma.game.update({
+        where: {
+          id: this.gameId,
+        },
+        data: {
+          result,
+          status: "COMPLETED",
+        },
+      });
+    }
+
     this.moveCount++;
   }
 }

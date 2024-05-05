@@ -1,8 +1,8 @@
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
-const GithubStrategy = require("passport-github").Strategy;
+const GithubStrategy = require("passport-github2").Strategy;
 import passport from "passport";
 import dotenv from "dotenv";
-import { db } from "./db";
+import { prisma } from "./db";
 
 dotenv.config();
 
@@ -40,10 +40,10 @@ export function initPassport() {
         profile: any,
         done: (error: any, user?: any) => void
       ) {
-        const user = await db.user.upsert({
+        const user = await prisma.user.upsert({
           create: {
             email: profile.emails[0].value,
-            name: profile.displayName,
+            username: profile.displayName,
             provider: "GOOGLE",
           },
           update: {
@@ -72,10 +72,10 @@ export function initPassport() {
         profile: any,
         done: (error: any, user?: any) => void
       ) {
-        const user = await db.user.upsert({
+        const user = await prisma.user.upsert({
           create: {
             email: profile.emails[0].value,
-            name: profile.displayName,
+            username: profile.displayName,
             provider: "GITHUB",
           },
           update: {

@@ -4,7 +4,6 @@ import { MOVE } from "../Pages/Game";
 import MoveTable from "./MovesTable";
 
 interface ChessBoardProps {
-  color: string | null;
   socket: WebSocket;
   board: ({
     square: Square;
