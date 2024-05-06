@@ -35,7 +35,6 @@ export class GameManager {
     if (gameIndex !== -1) {
       const game = this.games[gameIndex];
       if (game.player1.socket === socket) {
-        // game.player1 = null;
         if (game.player2) {
           game.player2.socket.send(
             JSON.stringify({ type: OPPONENT_DISCONNECTED })
@@ -71,6 +70,7 @@ export class GameManager {
         }
       }
 
+      console.log(message);
       if (message.type === MOVE) {
         const game = this.games.find(
           (game) => game.player1?.id === id || game.player2?.id === id

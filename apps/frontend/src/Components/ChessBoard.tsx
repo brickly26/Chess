@@ -1,9 +1,10 @@
 import { Chess, Color, PieceSymbol, Square } from "chess.js";
 import { useState } from "react";
-import { MOVE } from "../Pages/Game";
-import MoveTable from "./MovesTable";
+import { MOVE, Move } from "../Pages/Game";
 
 interface ChessBoardProps {
+  moves: Move[];
+  setMoves: React.Dispatch<React.SetStateAction<Move[]>>;
   socket: WebSocket;
   board: ({
     square: Square;
@@ -27,9 +28,10 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   socket,
   chess,
   setBoard,
+  setMoves,
+  moves,
 }) => {
   const [from, setFrom] = useState<null | Square>(null);
-  const [moves, setMoves] = useState<{ from: Square; to: Square }[]>([]);
   const [validSquares, setValidSquares] = useState<[number, number][]>([]);
 
   const handleDragStart = (e: React.DragEvent, square: Square) => {
@@ -61,7 +63,9 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
         to,
       });
       setBoard(chess.board());
+      setMoves([...moves, { from, to }]);
       setFrom(null);
+      setValidSquares([]);
     }
   };
 
@@ -91,13 +95,6 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   return (
     <div className="flex">
       <div>
-        {moves.length > 0 && (
-          <div className="mt-4">
-            <MoveTable moves={moves} />
-          </div>
-        )}
-      </div>
-      <div>
         {board.map((row, i) => {
           return (
             <div key={i} className="flex">
@@ -115,7 +112,9 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, squareCoord)}
                   >
-                    <div className="w-full h-full flex justify-center items-center">
+                    <div
+                      className={`w-full h-full flex justify-center items-center ${square ? "cursor-pointer" : ""}`}
+                    >
                       {validSquares.length > 0 ? (
                         <div
                           className={`${validSquares.some((square) => square[0] === i && square[1] === j) ? "bg-yellow-200 absolute p-2 flex justify-center items-center h-2 w-2 rounded-[50%]" : ""}`}

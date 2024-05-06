@@ -129,6 +129,7 @@ export class Game {
 
   async makeMove(socket: WebSocket, move: { from: string; to: string }) {
     // Validation (is it this players turn, is the move valid)
+    console.log(move);
     if (this.moveCount % 2 === 0 && socket !== this.player1.socket) {
       return;
     }
@@ -142,6 +143,8 @@ export class Game {
       console.log(error);
       return;
     }
+
+    console.log(move);
 
     // add move to db
     await this.addMoveToDb(move);

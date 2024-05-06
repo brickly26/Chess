@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
 import ChessBoard from "../Components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
-import { Chess } from "chess.js";
+import { Chess, Square } from "chess.js";
 import { useNavigate, useParams } from "react-router-dom";
+import MoveTable from "../Components/MovesTable";
 
 // TODO: Move together, there's code repetition here
 export const INIT_GAME = "init_game";
 export const MOVE = "move";
 export const GAME_OVER = "game_over";
+export const OPPONENT_DISCONNECTED = "opponent_disconnected";
 
 interface Metadata {
   blackPlayer: string;
   whitePlayer: string;
+}
+
+export interface Move {
+  from: Square;
+  to: Square;
 }
 
 const Game = () => {
@@ -25,9 +32,10 @@ const Game = () => {
   const [board, setBoard] = useState(chess.board());
   const [started, setStarted] = useState(false);
   const [gameMetadata, setGameMetadata] = useState<Metadata | null>(null);
-  const [result, setResult] = useState<"WHITE_WINS" | "BLACK_WINS" | "DRAW">(
-    false
-  );
+  const [result, setResult] = useState<
+    "WHITE_WINS" | "BLACK_WINS" | "DRAW" | typeof OPPONENT_DISCONNECTED | null
+  >(null);
+  const [moves, setMoves] = useState<Move[]>([]);
 
   useEffect(() => {
     if (!socket) {
@@ -50,10 +58,14 @@ const Game = () => {
         case MOVE:
           chess.move(message.payload.move);
           setBoard(chess.board());
+          setMoves((moves) => [...moves, message.payload.move]);
           break;
         case GAME_OVER:
           setResult(message.payload.result);
-          console.log("Game over");
+          break;
+        case OPPONENT_DISCONNECTED:
+          setResult(message.payload.result);
+          break;
       }
     };
   }, [socket, chess]);
@@ -77,6 +89,8 @@ const Game = () => {
                 board={board}
                 setBoard={setBoard}
                 chess={chess}
+                setMoves={setMoves}
+                moves={moves}
               />
             </div>
             <div className="col-span-2 bg-gray-600 rounded flex justify-center items-center">
@@ -95,6 +109,13 @@ const Game = () => {
                   Play
                 </button>
               )}
+              <div>
+                {moves.length > 0 && (
+                  <div className="mt-4">
+                    <MoveTable moves={moves} />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
