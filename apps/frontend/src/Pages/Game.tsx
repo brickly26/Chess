@@ -4,6 +4,7 @@ import { useSocket } from "../hooks/useSocket";
 import { Chess, Square } from "chess.js";
 import { useNavigate, useParams } from "react-router-dom";
 import MoveTable from "../Components/MovesTable";
+import { useUser } from "@repo/store/useUser";
 
 // TODO: Move together, there's code repetition here
 export const INIT_GAME = "init_game";
@@ -12,8 +13,8 @@ export const GAME_OVER = "game_over";
 export const OPPONENT_DISCONNECTED = "opponent_disconnected";
 
 interface Metadata {
-  blackPlayer: string;
-  whitePlayer: string;
+  blackPlayer: { id: string; name: string };
+  whitePlayer: { id: string; name: string };
 }
 
 export interface Move {
@@ -24,11 +25,12 @@ export interface Move {
 const Game = () => {
   const socket = useSocket();
   const { gameId } = useParams();
+  const user = useUser();
 
   const router = useNavigate();
 
   // Todo move to store/context
-  const [chess, setChess] = useState(new Chess());
+  const [chess, _setChess] = useState(new Chess());
   const [board, setBoard] = useState(chess.board());
   const [started, setStarted] = useState(false);
   const [gameMetadata, setGameMetadata] = useState<Metadata | null>(null);
@@ -75,7 +77,7 @@ const Game = () => {
   return (
     <div className="">
       <div className="justify-center flex pt-4 text-white">
-        {gameMetadata?.blackPlayer} vs {gameMetadata?.whitePlayer}
+        {gameMetadata?.blackPlayer.name} vs {gameMetadata?.whitePlayer.name}
       </div>
       {result && (
         <div className="justify-center flex pt-4 text-white">{result}</div>
@@ -85,6 +87,7 @@ const Game = () => {
           <div className="grid grid-cols-6 gap-4 w-full">
             <div className="col-span-4 w-full flex justify-center">
               <ChessBoard
+                myColor={user.id === gameMetadata?.blackPlayer.id ? "b" : "w"}
                 socket={socket}
                 board={board}
                 setBoard={setBoard}

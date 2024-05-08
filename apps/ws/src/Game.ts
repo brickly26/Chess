@@ -46,10 +46,14 @@ export class Game {
           payload: {
             color: "white",
             gameId: this.gameId,
-            whitePlayer: users.find((user) => user.id === this.player1.id)
-              ?.name,
-            blackPlayer: users.find((user) => user.id === this.player2.id)
-              ?.name,
+            whitePlayer: {
+              name: users.find((user) => user.id === this.player1.id)?.name,
+              id: this.player1.id,
+            }?.name,
+            blackPlayer: {
+              name: users.find((user) => user.id === this.player2.id)?.name,
+              id: this.player2.id,
+            },
             fen: this.board.fen(),
             moves: [],
           },
@@ -64,10 +68,14 @@ export class Game {
           payload: {
             color: "black",
             gameId: this.gameId,
-            whitePlayer: users.find((user) => user.id === this.player1.id)
-              ?.name,
-            blackPlayer: users.find((user) => user.id === this.player2.id)
-              ?.name,
+            whitePlayer: {
+              name: users.find((user) => user.id === this.player1.id)?.name,
+              id: this.player1.id,
+            }?.name,
+            blackPlayer: {
+              name: users.find((user) => user.id === this.player2.id)?.name,
+              id: this.player2.id,
+            },
             fen: this.board.fen(),
             moves: [],
           },

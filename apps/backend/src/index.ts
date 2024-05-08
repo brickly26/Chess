@@ -17,7 +17,7 @@ app.use(
     secret: "keyboard cat",
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false, maxAge: 360000 },
+    cookie: { secure: false, maxAge: 86400000 },
   })
 );
 
