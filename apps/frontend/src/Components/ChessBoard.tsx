@@ -57,7 +57,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   const handleDrop = (e: React.DragEvent, to: Square) => {
     e.preventDefault();
 
-    const square = algebraicToIndices(to);
+    const square = algebraicToIndices(to, chess.turn());
 
     const isValidMove = isArrayInNestedArray(validSquares, square);
 
@@ -88,7 +88,11 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   const validMoves = (square: Square | null) => {
     const moves = chess.moves({ square: square! });
 
-    const moveIndices = moves.map((move) => algebraicToIndices(move));
+    console.log(moves);
+
+    const moveIndices = moves.map((move) =>
+      algebraicToIndices(move, chess.turn())
+    );
     setValidSquares(moveIndices);
   };
 
@@ -112,9 +116,9 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, squareCoord)}
                     onClick={() => {
-                      console.log("click", [i, j]);
-                      if (square?.color !== chess.turn()) return;
+                      if (!from && square?.color !== chess.turn()) return;
                       if (!isMyTurn) return;
+
                       if (!from) {
                         validMoves(square && square.square);
                         setFrom(squareCoord);

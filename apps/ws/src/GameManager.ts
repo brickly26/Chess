@@ -70,7 +70,6 @@ export class GameManager {
         }
       }
 
-      console.log(message);
       if (message.type === MOVE) {
         const game = this.games.find(
           (game) => game.player1?.id === id || game.player2?.id === id

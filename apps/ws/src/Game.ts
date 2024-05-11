@@ -49,7 +49,7 @@ export class Game {
             whitePlayer: {
               name: users.find((user) => user.id === this.player1.id)?.name,
               id: this.player1.id,
-            }?.name,
+            },
             blackPlayer: {
               name: users.find((user) => user.id === this.player2.id)?.name,
               id: this.player2.id,
@@ -71,7 +71,7 @@ export class Game {
             whitePlayer: {
               name: users.find((user) => user.id === this.player1.id)?.name,
               id: this.player1.id,
-            }?.name,
+            },
             blackPlayer: {
               name: users.find((user) => user.id === this.player2.id)?.name,
               id: this.player2.id,
@@ -137,13 +137,18 @@ export class Game {
 
   async makeMove(socket: WebSocket, move: { from: string; to: string }) {
     // Validation (is it this players turn, is the move valid)
-    console.log(move);
+    console.log("1", move);
+
+    console.log(this.moveCount);
+
     if (this.moveCount % 2 === 0 && socket !== this.player1.socket) {
       return;
     }
+    console.log("2", move);
     if (this.moveCount % 2 === 1 && socket !== this.player2.socket) {
       return;
     }
+    console.log("3", move);
 
     try {
       this.board.move(move);

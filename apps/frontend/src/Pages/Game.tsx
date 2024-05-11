@@ -56,6 +56,8 @@ const Game = () => {
             blackPlayer: message.payload.blackPlayer,
             whitePlayer: message.payload.whitePlayer,
           });
+          console.log("blackPlayer:", message.payload.blackPlayer);
+          console.log("whitePlayer:", message.payload.whitePlayer);
           break;
         case MOVE:
           chess.move(message.payload.move);
