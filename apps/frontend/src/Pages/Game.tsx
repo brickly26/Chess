@@ -107,7 +107,7 @@ const Game = () => {
                 moves={moves}
               />
             </div>
-            <div className="col-span-2 bg-gray-600 rounded flex justify-center items-center">
+            <div className="col-span-2 bg-gray-600 rounded flex px-3 py-3">
               {!started && gameId === "random" && (
                 <button
                   className="bg-[#B48764] text-2xl hover:bg-[#bf9b80] text-white font-bold py-4 w-full mx-4 rounded"
@@ -123,13 +123,11 @@ const Game = () => {
                   Play
                 </button>
               )}
-              <div>
-                {moves.length > 0 && (
-                  <div className="mt-4">
-                    <MoveTable moves={moves} />
-                  </div>
-                )}
-              </div>
+              {moves.length > 0 && (
+                <div className="w-full">
+                  <MoveTable moves={moves} />
+                </div>
+              )}
             </div>
           </div>
         </div>
