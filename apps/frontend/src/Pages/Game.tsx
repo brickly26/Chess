@@ -1,3 +1,4 @@
+/* eslint-disable no-case-declarations */
 import { useEffect, useState } from "react";
 import ChessBoard from "../Components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
@@ -60,9 +61,16 @@ const Game = () => {
           console.log("whitePlayer:", message.payload.whitePlayer);
           break;
         case MOVE:
-          chess.move(message.payload.move);
+          const move = message.payload.move;
+          const moves = chess.moves({ verbose: true });
+          // TODO: fix later
+          if (
+            moves.map((x) => JSON.stringify(x)).includes(JSON.stringify(move))
+          )
+            return;
+          chess.move(move);
           setBoard(chess.board());
-          setMoves((moves) => [...moves, message.payload.move]);
+          setMoves((moves) => [...moves, move]);
           break;
         case GAME_OVER:
           setResult(message.payload.result);
@@ -89,6 +97,7 @@ const Game = () => {
           <div className="grid grid-cols-6 gap-4 w-full">
             <div className="col-span-4 w-full flex justify-center">
               <ChessBoard
+                gameId={gameId}
                 myColor={user.id === gameMetadata?.blackPlayer.id ? "b" : "w"}
                 socket={socket}
                 board={board}

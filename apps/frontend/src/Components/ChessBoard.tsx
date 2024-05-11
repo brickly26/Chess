@@ -4,6 +4,7 @@ import { MOVE, Move } from "../Pages/Game";
 import { algebraicToIndices, isArrayInNestedArray } from "../util/functions";
 
 interface ChessBoardProps {
+  gameId: string;
   myColor: Color;
   moves: Move[];
   setMoves: React.Dispatch<React.SetStateAction<Move[]>>;
@@ -26,6 +27,7 @@ interface ChessBoardProps {
 }
 
 const ChessBoard: React.FC<ChessBoardProps> = ({
+  gameId,
   myColor,
   board,
   socket,
@@ -129,6 +131,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
                               JSON.stringify({
                                 type: MOVE,
                                 payload: {
+                                  gameId,
                                   move: {
                                     from,
                                     to: squareCoord,
