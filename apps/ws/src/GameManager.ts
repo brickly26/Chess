@@ -1,5 +1,12 @@
 import { WebSocket } from "ws";
-import { INIT_GAME, MOVE, JOIN_GAME, OPPONENT_DISCONNECTED } from "./messages";
+import {
+  INIT_GAME,
+  MOVE,
+  JOIN_GAME,
+  OPPONENT_DISCONNECTED,
+  GAME_NOT_FOUND,
+  GAME_JOINED,
+} from "./messages";
 import { Game } from "./Game";
 
 import { prisma } from "./db";
@@ -21,7 +28,7 @@ export class GameManager {
     this.addHandler(user);
   }
 
-  removeUser(socket: WebSocket, userId: string) {
+  removeUser(socket: WebSocket) {
     const user = this.users.find((user) => user.socket !== socket);
 
     if (!user) {
@@ -30,6 +37,7 @@ export class GameManager {
     }
 
     this.users = this.users.filter((user) => user.socket !== socket);
+    console.log("remove User called");
     SocketManager.getInstance().removeUser(user);
   }
 
@@ -63,69 +71,68 @@ export class GameManager {
         }
       }
 
-      //     if (message.type === JOIN_GAME) {
-      //       if (message.payload?.gameId) {
-      //         const {
-      //           payload: { gameId },
-      //         } = message;
-      //         const availableGame = this.games.find(
-      //           (game) => game.gameId === gameId
-      //         );
-      //         if (availableGame) {
-      //           const { player1, player2, gameId, board } = availableGame;
-      //           if (player1 && player2) {
-      //             socket.send(JSON.stringify({ type: "GAME_FULL" }));
-      //           }
-      //           if (!player1) {
-      //             availableGame.player1.socket = socket;
-      //             player2.socket?.send(JSON.stringify({ type: "OPPONENT_JOINED" }));
-      //           } else if (!player2) {
-      //             availableGame.player2.socket = socket;
-      //             player1.socket.send(JSON.stringify({ type: "OPPONENT_JOINED" }));
-      //           }
-      //           socket.send(
-      //             JSON.stringify({
-      //               type: "GAME_JOINED",
-      //               payload: {
-      //                 gameId,
-      //                 board,
-      //               },
-      //             })
-      //           );
-      //           return;
-      //         } else {
-      //           const gameFromDb = await prisma.game.findUnique({
-      //             where: {
-      //               id: gameId,
-      //             },
-      //             include: {
-      //               moves: {
-      //                 orderBy: {
-      //                   moveNumber: "asc",
-      //                 },
-      //               },
-      //             },
-      //           });
-      //           const game = new Game(
-      //             { socket, id: gameFromDb?.whitePlayerId! },
-      //             { socket, id: gameFromDb?.blackPlayerId! }
-      //           );
-      //           gameFromDb?.moves.forEach((move: { from: string; to: string }) => {
-      //             game.board.move(move);
-      //           });
-      //           this.games.push(game);
-      //           socket.send(
-      //             JSON.stringify({
-      //               type: "GAME_JOINED",
-      //               payload: {
-      //                 gameId,
-      //                 board: game.board,
-      //               },
-      //             })
-      //           );
-      //         }
-      //       }
-      //     }
+      if (message.type === JOIN_GAME) {
+        const gameId = message.payload?.gameId;
+        if (!gameId) {
+          return;
+        }
+
+        const availableGame = this.games.find((game) => game.gameId === gameId);
+
+        const gameFromDb = await prisma.game.findUnique({
+          where: {
+            id: gameId,
+          },
+          include: {
+            moves: {
+              orderBy: {
+                moveNumber: "asc",
+              },
+            },
+            blackPlayer: true,
+            whitePlayer: true,
+          },
+        });
+
+        if (!gameFromDb) {
+          user.socket.send(
+            JSON.stringify({
+              type: GAME_NOT_FOUND,
+            })
+          );
+          return;
+        }
+
+        if (!availableGame) {
+          const game =
+            availableGame ??
+            new Game(gameFromDb?.whitePlayerId!, gameFromDb?.blackPlayerId!);
+          gameFromDb?.moves.forEach((move: { from: string; to: string }) => {
+            game.board.move(move);
+          });
+          this.games.push(game);
+        }
+
+        user.socket.send(
+          JSON.stringify({
+            type: GAME_JOINED,
+            payload: {
+              gameId,
+              moves: gameFromDb.moves,
+              blackPlayer: {
+                id: gameFromDb?.blackPlayerId,
+                name: gameFromDb?.blackPlayer.name,
+              },
+              whitePlayer: {
+                id: gameFromDb?.blackPlayerId,
+                name: gameFromDb?.whitePlayer.name,
+              },
+            },
+          })
+        );
+
+        SocketManager.getInstance().addUser(user, gameId);
+      }
     });
   }
 }

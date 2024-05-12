@@ -90,8 +90,6 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   const validMoves = (square: Square | null) => {
     const moves = chess.moves({ square: square! });
 
-    console.log(moves);
-
     const moveIndices = moves.map((move) =>
       algebraicToIndices(move, chess.turn())
     );

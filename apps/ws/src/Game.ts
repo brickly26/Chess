@@ -113,18 +113,16 @@ export class Game {
 
   async makeMove(user: User, move: { from: string; to: string }) {
     // Validation (is it this players turn, is the move valid)
-    console.log("1", move);
 
     console.log(this.moveCount);
 
     if (this.moveCount % 2 === 0 && user.userId !== this.player1UserId) {
       return;
     }
-    console.log("2", move);
+
     if (this.moveCount % 2 === 1 && user.userId !== this.player2UserId) {
       return;
     }
-    console.log("3", move);
 
     try {
       this.board.move(move);
@@ -132,8 +130,6 @@ export class Game {
       console.log(error);
       return;
     }
-
-    console.log(move);
 
     // add move to db
     await this.addMoveToDb(move);

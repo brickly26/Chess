@@ -11,7 +11,10 @@ import { useUser } from "@repo/store/useUser";
 export const INIT_GAME = "init_game";
 export const MOVE = "move";
 export const GAME_OVER = "game_over";
+export const JOIN_GAME = "join_game";
 export const OPPONENT_DISCONNECTED = "opponent_disconnected";
+export const JOIN_ROOM = "join_room";
+export const GAME_JOINED = "game_joined";
 
 interface Metadata {
   blackPlayer: { id: string; name: string };
@@ -48,6 +51,8 @@ const Game = () => {
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
 
+      console.log(message.type);
+
       switch (message.type) {
         case INIT_GAME:
           setBoard(chess.board());
@@ -57,8 +62,6 @@ const Game = () => {
             blackPlayer: message.payload.blackPlayer,
             whitePlayer: message.payload.whitePlayer,
           });
-          console.log("blackPlayer:", message.payload.blackPlayer);
-          console.log("whitePlayer:", message.payload.whitePlayer);
           break;
         case MOVE:
           const move = message.payload.move;
@@ -76,10 +79,32 @@ const Game = () => {
           setResult(message.payload.result);
           break;
         case OPPONENT_DISCONNECTED:
-          setResult(message.payload.result);
+          setResult(OPPONENT_DISCONNECTED);
+          break;
+        case GAME_JOINED:
+          console.log(message.payload);
+          setGameMetadata({
+            blackPlayer: message.payload.blackPlayer,
+            whitePlayer: message.payload.whitePlayer,
+          });
+          setStarted(true);
+          setMoves(message.payload.moves);
+          message.payload.moves.map((x) => chess.move(x));
+          setBoard(chess.board());
           break;
       }
     };
+
+    if (gameId !== "random") {
+      socket.send(
+        JSON.stringify({
+          type: JOIN_GAME,
+          payload: {
+            gameId,
+          },
+        })
+      );
+    }
   }, [socket, chess]);
 
   if (!socket) return <div>Connecting...</div>;
@@ -97,7 +122,7 @@ const Game = () => {
           <div className="grid grid-cols-6 gap-4 w-full">
             <div className="col-span-4 w-full flex justify-center">
               <ChessBoard
-                gameId={gameId}
+                gameId={gameId ?? ""}
                 myColor={user.id === gameMetadata?.blackPlayer.id ? "b" : "w"}
                 socket={socket}
                 board={board}

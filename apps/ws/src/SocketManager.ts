@@ -54,6 +54,7 @@ export class SocketManager {
 
   removeUser(user: User) {
     const roomId = this.userRoomMapping.get(user.id);
+
     if (!roomId) {
       console.log("User was not interest in any room?");
       return;

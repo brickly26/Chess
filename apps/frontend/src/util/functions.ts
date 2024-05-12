@@ -6,8 +6,6 @@ export const algebraicToIndices = (
 ): [number, number] => {
   let file: number, rank: number;
 
-  console.log(color, square);
-
   if (square === "O-O") {
     if (color === "b") {
       return [0, 6];
