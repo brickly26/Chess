@@ -32,6 +32,9 @@ export const algebraicToIndices = (
     if (square[3] === "+") {
       file = square.charCodeAt(1) - "a".charCodeAt(0);
       rank = 8 - parseInt(square.substring(2));
+    } else if (square[2] === "=") {
+      file = square.charCodeAt(0) - "a".charCodeAt(0);
+      rank = 8 - parseInt(square.substring(1));
     } else {
       file = square.charCodeAt(2) - "a".charCodeAt(0);
       rank = 8 - parseInt(square.substring(3));

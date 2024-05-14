@@ -3,7 +3,33 @@ import { useState } from "react";
 import { MOVE, Move } from "../Pages/Game";
 import { algebraicToIndices, isArrayInNestedArray } from "../util/functions";
 
+export const isPromoting = (chess: Chess, from: Square, to: Square) => {
+  if (!from) {
+    return false;
+  }
+
+  const piece = chess.get(from);
+
+  if (piece?.type !== "p") {
+    return false;
+  }
+
+  if (piece.color !== chess.turn()) {
+    return false;
+  }
+
+  if (!["1", "8"].some((it) => to.endsWith(it))) {
+    return false;
+  }
+
+  return chess
+    .moves({ square: from, verbose: true })
+    .map((it) => it.to)
+    .includes(to);
+};
+
 interface ChessBoardProps {
+  started: boolean;
   gameId: string;
   myColor: Color;
   moves: Move[];
@@ -27,6 +53,7 @@ interface ChessBoardProps {
 }
 
 const ChessBoard: React.FC<ChessBoardProps> = ({
+  started,
   gameId,
   myColor,
   board,
@@ -90,6 +117,8 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   const validMoves = (square: Square | null) => {
     const moves = chess.moves({ square: square! });
 
+    console.log(chess.moves({ square: square! }));
+
     const moveIndices = moves.map((move) =>
       algebraicToIndices(move, chess.turn())
     );
@@ -116,14 +145,32 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, squareCoord)}
                     onClick={() => {
+                      if (!started) {
+                        return;
+                      }
                       if (!from && square?.color !== chess.turn()) return;
                       if (!isMyTurn) return;
+                      if (from === squareCoord) {
+                        setFrom(null);
+                        setValidSquares([]);
+                      }
 
                       if (!from) {
                         validMoves(square && square.square);
                         setFrom(squareCoord);
                       } else {
                         try {
+                          const isPromoting = isPromoting(
+                            chess,
+                            from,
+                            squareCoord
+                          );
+
+                          chess.move({
+                            from,
+                            to: squareCoord,
+                          });
+
                           if (isArrayInNestedArray(validSquares, [i, j])) {
                             socket.send(
                               JSON.stringify({
@@ -141,7 +188,9 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
                             chess.move({
                               from,
                               to: squareCoord,
+                              promotion: "q",
                             });
+
                             setBoard(chess.board());
                             setMoves([...moves, { from, to: squareCoord }]);
                           }
