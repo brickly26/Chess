@@ -1,9 +1,34 @@
 import WebSocket from "ws";
-import { Chess } from "chess.js";
+import { Chess, Square } from "chess.js";
 import { GAME_OVER, INIT_GAME, MOVE } from "./messages";
 import { prisma } from "./db";
 import { randomUUID } from "crypto";
 import { SocketManager, User } from "./SocketManager";
+
+export function isPromoting(chess: Chess, from: Square, to: Square) {
+  if (!from) {
+    return false;
+  }
+
+  const piece = chess.get(from);
+
+  if (piece?.type !== "p") {
+    return false;
+  }
+
+  if (piece.color !== chess.turn()) {
+    return false;
+  }
+
+  if (!["1", "8"].some((it) => to.endsWith(it))) {
+    return false;
+  }
+
+  return chess
+    .moves({ square: from, verbose: true })
+    .map((it) => it.to)
+    .includes(to);
+}
 
 export class Game {
   public gameId: string;

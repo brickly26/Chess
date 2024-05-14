@@ -1,16 +1,20 @@
 import { WebSocket } from "ws";
 import {
+  GAME_OVER,
   INIT_GAME,
-  MOVE,
   JOIN_GAME,
+  MOVE,
   OPPONENT_DISCONNECTED,
-  GAME_NOT_FOUND,
+  JOIN_ROOM,
   GAME_JOINED,
+  GAME_NOT_FOUND,
+  GAME_ALERT,
+  GAME_ADDED,
 } from "./messages";
-import { Game } from "./Game";
-
+import { Game, isPromoting } from "./Game";
 import { prisma } from "./db";
 import { SocketManager, User } from "./SocketManager";
+import { Square } from "chess.js";
 
 export class GameManager {
   private games: Game[];
@@ -41,6 +45,10 @@ export class GameManager {
     SocketManager.getInstance().removeUser(user);
   }
 
+  removeGame(gameId: string) {
+    this.games = this.games.filter((game) => gameId !== game.gameId);
+  }
+
   private addHandler(user: User) {
     user.socket.on("message", async (data) => {
       const message = JSON.parse(data.toString());
@@ -52,6 +60,18 @@ export class GameManager {
             console.log("Pending game not found?");
             return;
           }
+          if (user.userId === game.player1UserId) {
+            SocketManager.getInstance().broadcast(
+              game.gameId,
+              JSON.stringify({
+                type: GAME_ALERT,
+                payload: {
+                  message: "Trying to connect with yourself?",
+                },
+              })
+            );
+            return;
+          }
           SocketManager.getInstance().addUser(user, game.gameId);
           await game?.updateSecondPlayer(user.userId);
           this.pendingGameId = null;
@@ -60,6 +80,12 @@ export class GameManager {
           this.games.push(game);
           this.pendingGameId = game.gameId;
           SocketManager.getInstance().addUser(user, game.gameId);
+          SocketManager.getInstance().broadcast(
+            game.gameId,
+            JSON.stringify({
+              type: GAME_ADDED,
+            })
+          );
         }
       }
 
@@ -68,6 +94,12 @@ export class GameManager {
         const game = this.games.find((game) => game.gameId === gameId);
         if (game) {
           game.makeMove(user, message.payload.move);
+          game.clearTimer();
+          const timer = setTimeout(() => {
+            game.endGame();
+            this.removeGame(game.gameId);
+          }, 60 * 1000);
+          game.setTimer(timer);
         }
       }
 
