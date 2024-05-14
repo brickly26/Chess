@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 import { Chess, Square } from "chess.js";
-import { GAME_OVER, INIT_GAME, MOVE } from "./messages";
+import { GAME_OVER, INIT_GAME, MOVE, USER_TIMEOUT } from "./messages";
 import { prisma } from "./db";
 import { randomUUID } from "crypto";
 import { SocketManager, User } from "./SocketManager";
@@ -37,6 +37,11 @@ export class Game {
   public board: Chess;
   private startTime: Date;
   private moveCount = 0;
+  private timer: NodeJS.Timeout | null = null;
+  private player1Time: number = 10 * 60 * 1000;
+  private player2Time: number = 10 * 60 * 1000;
+  private gameStartTime: number = 0;
+  private tempTime: number = 0;
 
   constructor(player1UserId: string, player2UserId: string | null) {
     this.player1UserId = player1UserId;
@@ -200,5 +205,35 @@ export class Game {
     }
 
     this.moveCount++;
+  }
+
+  async endGame() {
+    SocketManager.getInstance().broadcast(
+      this.gameId,
+      JSON.stringify({
+        type: USER_TIMEOUT,
+        payload: {
+          win: this.board.turn() === "b" ? "WHITE_WINS" : "BLACK_WINS",
+        },
+      })
+    );
+  }
+
+  async setTimer(timer: NodeJS.Timeout) {
+    this.timer = timer;
+  }
+
+  clearTimer() {
+    if (this.timer) clearTimeout(this.timer);
+  }
+
+  updateUserTimer(user: User) {
+    const time = new Date(Date.now()).getTime();
+    if (user.userId === this.player1UserId) {
+      this.player1Time -= time - this.tempTime;
+    } else {
+      this.player2Time -= time - this.tempTime;
+    }
+    this.tempTime = time;
   }
 }
