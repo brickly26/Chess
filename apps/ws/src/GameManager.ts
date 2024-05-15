@@ -136,11 +136,25 @@ export class GameManager {
         }
 
         if (!availableGame) {
-          const game =
-            availableGame ??
-            new Game(gameFromDb?.whitePlayerId!, gameFromDb?.blackPlayerId!);
+          const game = new Game(
+            gameFromDb?.whitePlayerId!,
+            gameFromDb?.blackPlayerId!
+          );
           gameFromDb?.moves.forEach((move: { from: string; to: string }) => {
-            game.board.move(move);
+            if (
+              isPromoting(game.board, move.from as Square, move.to as Square)
+            ) {
+              game.board.move({
+                from: move.from,
+                to: move.to,
+                promotion: "q",
+              });
+            } else {
+              game.board.move({
+                from: move.from,
+                to: move.to,
+              });
+            }
           });
           this.games.push(game);
         }

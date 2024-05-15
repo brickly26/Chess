@@ -88,6 +88,9 @@ export class Game {
         },
       })
     );
+    const time = new Date(Date.now()).getTime();
+    this.gameStartTime = time;
+    this.tempTime = time;
   }
 
   async createGameInDb() {
@@ -141,11 +144,8 @@ export class Game {
     ]);
   }
 
-  async makeMove(user: User, move: { from: string; to: string }) {
+  async makeMove(user: User, move: { from: Square; to: Square }) {
     // Validation (is it this players turn, is the move valid)
-
-    console.log(this.moveCount);
-
     if (this.moveCount % 2 === 0 && user.userId !== this.player1UserId) {
       return;
     }
@@ -154,8 +154,41 @@ export class Game {
       return;
     }
 
+    if (this.player1Time <= 0 || this.player2Time <= 0) {
+      SocketManager.getInstance().broadcast(
+        this.gameId,
+        JSON.stringify({
+          type: USER_TIMEOUT,
+          payload: {
+            win: this.player1Time <= 0 ? "BLACK_WINS" : "WHITE_WINS",
+          },
+        })
+      );
+
+      await prisma.game.update({
+        where: {
+          id: this.gameId,
+        },
+        data: {
+          status: "COMPLETED",
+          result: this.player1Time <= 0 ? "BLACK_WINS" : "WHITE_WINS",
+        },
+      });
+    }
+
     try {
-      this.board.move(move);
+      if (isPromoting(this.board, move.from, move.to)) {
+        this.board.move({
+          from: move.from,
+          to: move.to,
+          promotion: "q",
+        });
+      } else {
+        this.board.move({
+          from: move.from,
+          to: move.to,
+        });
+      }
     } catch (error) {
       console.log(error);
       return;
@@ -164,6 +197,9 @@ export class Game {
     // add move to db
     await this.addMoveToDb(move);
 
+    // update Timer
+    this.updateUserTimer(user);
+
     // Send the update
     SocketManager.getInstance().broadcast(
       this.gameId,
@@ -171,6 +207,18 @@ export class Game {
         type: MOVE,
         payload: {
           move,
+        },
+      })
+    );
+    SocketManager.getInstance().broadcast(
+      this.gameId,
+      JSON.stringify({
+        type: "GAME_TIME",
+        payload: {
+          player1UserId: this.player1UserId,
+          player1Time: this.player1Time,
+          player2UserId: this.player2UserId,
+          player2Time: this.player2Time,
         },
       })
     );
