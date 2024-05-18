@@ -211,8 +211,8 @@ const Game = () => {
     }
   }, [started, gameMetadata, user]);
 
-  const getTimer = (tempConsumed: number) => {
-    const timeLeftMs = GAME_TIME_MS - player1TimeConsumed;
+  const getTimer = (timeConsumed: number) => {
+    const timeLeftMs = GAME_TIME_MS - timeConsumed;
     const minutes = Math.floor(timeLeftMs / (1000 * 60));
     const remainingSeconds = Math.floor((timeLeftMs % (1000 * 60)) / 1000);
 

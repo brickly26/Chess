@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
-import { Chess, Color, PieceSymbol, Square } from "chess.js";
-import { useState, MouseEvent } from "react";
-import { MOVE, Move } from "../Pages/Game";
+import { Chess, Color, Move, PieceSymbol, Square } from "chess.js";
+import { useState, MouseEvent, memo, useEffect } from "react";
+import { MOVE } from "../Pages/Game";
 import useWindowSize from "../hooks/useWindowSize";
 import MoveSound from "/MoveSound.mp3";
 import CaptureSound from "/capture.wav";
