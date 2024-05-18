@@ -1,15 +1,13 @@
-import WebSocket from "ws";
-import { Chess, Square } from "chess.js";
-import {
-  GAME_OVER,
-  GAME_TIME,
-  INIT_GAME,
-  MOVE,
-  USER_TIMEOUT,
-} from "./messages";
+import { Chess, Square, Move } from "chess.js";
+import { GAME_OVER, INIT_GAME, MOVE, GAME_ENDED } from "./messages";
 import { prisma } from "./db";
 import { randomUUID } from "crypto";
 import { SocketManager, User } from "./SocketManager";
+
+type GAME_STATUS = "IN_PROGRESS" | "COMPLETED" | "ABANDONED" | "TIME_UP";
+type GAME_RESULT = "WHITE_WINS" | "BLACK_WINS" | "DRAW";
+
+const GAME_TIME_MS = 10 * 60 * 60 * 1000;
 
 export function isPromoting(chess: Chess, from: Square, to: Square) {
   if (!from) {
@@ -41,20 +39,74 @@ export class Game {
   public player1UserId: string;
   public player2UserId: string | null;
   public board: Chess;
-  private startTime: Date;
+  public result: GAME_RESULT | null = null;
   private moveCount = 0;
+  private moveTimer: NodeJS.Timeout | null = null;
   private timer: NodeJS.Timeout | null = null;
-  private player1Time: number = 10 * 60 * 1000;
-  private player2Time: number = 10 * 60 * 1000;
-  private gameStartTime: number = 0;
-  private tempTime: number = 0;
+  private player1TimeConsumed: number = 0;
+  private player2TimeConsumed: number = 0;
+  private lastMoveTime: Date = new Date(Date.now());
+  private startTime: Date = new Date(Date.now());
 
-  constructor(player1UserId: string, player2UserId: string | null) {
+  constructor(
+    player1UserId: string,
+    player2UserId: string | null,
+    gameId?: string,
+    startTime?: Date
+  ) {
     this.player1UserId = player1UserId;
     this.player2UserId = player2UserId;
     this.board = new Chess();
     this.startTime = new Date();
-    this.gameId = randomUUID();
+    this.gameId = gameId ?? randomUUID();
+    if (startTime) {
+      this.startTime = startTime;
+      this.lastMoveTime = startTime;
+    }
+  }
+
+  seedMoves(
+    moves: {
+      id: string;
+      gameId: string;
+      moveNumber: number;
+      from: string;
+      to: string;
+      comments: string | null;
+      timeTaken: number | null;
+      createdAt: Date;
+    }[]
+  ) {
+    moves.forEach((move: { from: string; to: string }) => {
+      if (isPromoting(this.board, move.from as Square, move.to as Square)) {
+        this.board.move({
+          from: move.from,
+          to: move.to,
+          promotion: "q",
+        });
+      } else {
+        this.board.move({
+          from: move.from,
+          to: move.to,
+        });
+      }
+    });
+    this.moveCount = moves.length;
+    if (moves[moves.length - 1]) {
+      this.lastMoveTime = moves[moves.length - 1].createdAt;
+    }
+
+    moves.map((move, index) => {
+      if (move.timeTaken) {
+        if (index % 2 === 0) {
+          this.player1TimeConsumed += move.timeTaken;
+        } else {
+          this.player2TimeConsumed += move.timeTaken;
+        }
+      }
+    });
+    this.resetAbandonTimer();
+    this.resetMoveTimer();
   }
 
   async updateSecondPlayer(player2UserId: string) {
@@ -63,7 +115,7 @@ export class Game {
     const users = await prisma.user.findMany({
       where: {
         id: {
-          in: [this.player1UserId, this.player2UserId],
+          in: [this.player1UserId, this.player2UserId ?? ""],
         },
       },
     });
@@ -94,17 +146,18 @@ export class Game {
         },
       })
     );
-    const time = new Date(Date.now()).getTime();
-    this.gameStartTime = time;
-    this.tempTime = time;
   }
 
   async createGameInDb() {
+    this.startTime = new Date(Date.now());
+    this.lastMoveTime = this.startTime;
+
     const game = await prisma.game.create({
       data: {
         id: this.gameId,
         timeControl: "CLASSICAL",
         status: "IN_PROGRESS",
+        startAt: this.startTime,
         currentFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         whitePlayer: {
           connect: {
@@ -125,7 +178,7 @@ export class Game {
     this.gameId = game.id;
   }
 
-  async addMoveToDb(move: { from: string; to: string }) {
+  async addMoveToDb(move: Move, moveTimestamp: Date) {
     await prisma.$transaction([
       prisma.move.create({
         data: {
@@ -133,10 +186,11 @@ export class Game {
           moveNumber: this.moveCount + 1,
           from: move.from,
           to: move.to,
-          // Todo: Fix start fen
-          startFen: this.board.fen(),
-          endFen: this.board.fen(),
-          createdAt: new Date(Date.now()),
+          before: move.before,
+          after: move.after,
+          createdAt: moveTimestamp,
+          timeTaken: moveTimestamp.getTime() - this.lastMoveTime.getTime(),
+          san: move.san,
         },
       }),
       prisma.game.update({
@@ -144,43 +198,30 @@ export class Game {
           id: this.gameId,
         },
         data: {
-          currentFen: this.board.fen(),
+          currentFen: move.after,
         },
       }),
     ]);
   }
 
-  async makeMove(user: User, move: { from: Square; to: Square }) {
+  async makeMove(user: User, move: Move) {
     // Validation (is it this players turn, is the move valid)
-    if (this.moveCount % 2 === 0 && user.userId !== this.player1UserId) {
+    if (this.board.turn() === "w" && user.userId !== "this.player1UserId") {
       return;
     }
 
-    if (this.moveCount % 2 === 1 && user.userId !== this.player2UserId) {
+    if (this.board.turn() === "b" && user.userId !== this.player2UserId) {
       return;
     }
 
-    if (this.player1Time <= 0 || this.player2Time <= 0) {
-      SocketManager.getInstance().broadcast(
-        this.gameId,
-        JSON.stringify({
-          type: USER_TIMEOUT,
-          payload: {
-            win: this.player1Time <= 0 ? "BLACK_WINS" : "WHITE_WINS",
-          },
-        })
+    if (this.result) {
+      console.error(
+        `User ${user.userId} is making a move post game completion`
       );
-
-      await prisma.game.update({
-        where: {
-          id: this.gameId,
-        },
-        data: {
-          status: "COMPLETED",
-          result: this.player1Time <= 0 ? "BLACK_WINS" : "WHITE_WINS",
-        },
-      });
+      return;
     }
+
+    const moveTimestamp = new Date(Date.now());
 
     try {
       if (isPromoting(this.board, move.from, move.to)) {
@@ -200,11 +241,26 @@ export class Game {
       return;
     }
 
+    // flippped because move has already happened
+    if (this.board.turn() === "b") {
+      this.player1TimeConsumed =
+        this.player1TimeConsumed +
+        (moveTimestamp.getTime() - this.lastMoveTime.getTime());
+    }
+
+    if (this.board.turn() === "w") {
+      this.player2TimeConsumed =
+        this.player2TimeConsumed +
+        (moveTimestamp.getTime() - this.lastMoveTime.getTime());
+    }
     // add move to db
-    await this.addMoveToDb(move);
+    await this.addMoveToDb(move, moveTimestamp);
 
     // update Timer
-    this.updateUserTimer(user);
+    this.resetAbandonTimer();
+    this.resetMoveTimer();
+
+    this.lastMoveTime = moveTimestamp;
 
     // Send the update
     SocketManager.getInstance().broadcast(
@@ -213,18 +269,8 @@ export class Game {
         type: MOVE,
         payload: {
           move,
-        },
-      })
-    );
-    SocketManager.getInstance().broadcast(
-      this.gameId,
-      JSON.stringify({
-        type: GAME_TIME,
-        payload: {
-          player1UserId: this.player1UserId,
-          player1Time: this.player1Time,
-          player2UserId: this.player2UserId,
-          player2Time: this.player2Time,
+          player1TimeConsumed: this.player1TimeConsumed,
+          player2TimeConsumed: this.player2TimeConsumed,
         },
       })
     );
@@ -237,57 +283,103 @@ export class Game {
           ? "WHITE_WINS"
           : "BLACK_WINS";
 
-      SocketManager.getInstance().broadcast(
-        this.gameId,
-        JSON.stringify({
-          type: GAME_OVER,
-          payload: {
-            result,
-          },
-        })
-      );
-
-      await prisma.game.update({
-        where: {
-          id: this.gameId,
-        },
-        data: {
-          result,
-          status: "COMPLETED",
-        },
-      });
+      this.endGame("COMPLETED", result);
     }
 
     this.moveCount++;
   }
 
-  async endGame() {
+  getPlayer1TimeConsumed() {
+    if (this.board.turn() === "w") {
+      return (
+        this.player1TimeConsumed +
+        (new Date(Date.now()).getTime() - this.lastMoveTime.getTime())
+      );
+    }
+    return this.player1TimeConsumed;
+  }
+
+  getPlayer2TimeConsumed() {
+    if (this.board.turn() === "b") {
+      return (
+        this.player2TimeConsumed +
+        (new Date(Date.now()).getTime() - this.lastMoveTime.getTime())
+      );
+    }
+    return this.player2TimeConsumed;
+  }
+
+  async resetAbandonTimer() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+    }
+    this.timer = setTimeout(() => {
+      this.endGame(
+        "ABANDONED",
+        this.board.turn() === "b" ? "WHITE_WINS" : "BLACK_WINS"
+      );
+    }, 60 * 1000);
+  }
+
+  async resetMoveTimer() {
+    if (this.moveTimer) {
+      clearTimeout(this.moveTimer);
+    }
+  }
+
+  async endGame(status: GAME_STATUS, result: GAME_RESULT) {
+    const updatedGame = await prisma.game.update({
+      data: {
+        status,
+        result: result,
+      },
+      where: {
+        id: this.gameId,
+      },
+      include: {
+        moves: {
+          orderBy: {
+            moveNumber: "asc",
+          },
+        },
+        blackPlayer: true,
+        whitePlayer: true,
+      },
+    });
+
     SocketManager.getInstance().broadcast(
       this.gameId,
       JSON.stringify({
-        type: USER_TIMEOUT,
+        type: GAME_ENDED,
         payload: {
-          win: this.board.turn() === "b" ? "WHITE_WINS" : "BLACK_WINS",
+          result,
+          status,
+          moves: updatedGame.moves,
+          blackPlayer: {
+            id: updatedGame.blackPlayer.id,
+            name: updatedGame.blackPlayer.name,
+          },
+          whitePlayer: {
+            id: updatedGame.whitePlayer.id,
+            name: updatedGame.whitePlayer.name,
+          },
         },
       })
     );
+
+    this.clearTimer();
+    this.clearMoveTimer();
   }
 
-  async setTimer(timer: NodeJS.Timeout) {
+  clearMoveTimer() {
+    if (this.moveTimer) clearTimeout(this.moveTimer);
+  }
+
+  setTimer(timer: NodeJS.Timeout) {
     this.timer = timer;
   }
 
   clearTimer() {
     if (this.timer) clearTimeout(this.timer);
-  }
-
-  updateUserTimer(user: User) {
-    const time = new Date(Date.now()).getTime();
-    if (user.userId === this.player1UserId) {
-      this.player1Time -= time - this.tempTime;
-    } else {
-      this.player2Time -= time - this.tempTime;
-    }
-    this.tempTime = time;
   }
 }

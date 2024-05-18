@@ -10,11 +10,13 @@ import {
   GAME_NOT_FOUND,
   GAME_ALERT,
   GAME_ADDED,
+  GAME_ENDED,
 } from "./messages";
 import { Game, isPromoting } from "./Game";
 import { prisma } from "./db";
 import { SocketManager, User } from "./SocketManager";
 import { Square } from "chess.js";
+import { GameStatus } from "@prisma/client";
 
 export class GameManager {
   private games: Game[];
@@ -33,7 +35,7 @@ export class GameManager {
   }
 
   removeUser(socket: WebSocket) {
-    const user = this.users.find((user) => user.socket !== socket);
+    const user = this.users.find((user) => user.socket === socket);
 
     if (!user) {
       console.error("User not found?");
@@ -93,12 +95,9 @@ export class GameManager {
         const game = this.games.find((game) => game.gameId === gameId);
         if (game) {
           game.makeMove(user, message.payload.move);
-          game.clearTimer();
-          const timer = setTimeout(() => {
-            game.endGame();
+          if (game.result) {
             this.removeGame(game.gameId);
-          }, 60 * 1000);
-          game.setTimer(timer);
+          }
         }
       }
 
@@ -134,27 +133,36 @@ export class GameManager {
           return;
         }
 
+        if (gameFromDb.status !== GameStatus.IN_PROGRESS) {
+          user.socket.send(
+            JSON.stringify({
+              type: GAME_ENDED,
+              pyalod: {
+                result: gameFromDb.result,
+                status: gameFromDb.status,
+                moves: gameFromDb.moves,
+                blackPlayer: {
+                  id: gameFromDb.blackPlayer.id,
+                  name: gameFromDb.blackPlayer.name,
+                },
+                whitePlayer: {
+                  id: gameFromDb.whitePlayer.id,
+                  name: gameFromDb.whitePlayer.name,
+                },
+              },
+            })
+          );
+          return;
+        }
+
         if (!availableGame) {
           const game = new Game(
             gameFromDb?.whitePlayerId!,
-            gameFromDb?.blackPlayerId!
+            gameFromDb?.blackPlayerId!,
+            gameFromDb.id,
+            gameFromDb.startAt
           );
-          gameFromDb?.moves.forEach((move: { from: string; to: string }) => {
-            if (
-              isPromoting(game.board, move.from as Square, move.to as Square)
-            ) {
-              game.board.move({
-                from: move.from,
-                to: move.to,
-                promotion: "q",
-              });
-            } else {
-              game.board.move({
-                from: move.from,
-                to: move.to,
-              });
-            }
-          });
+          game.seedMoves(gameFromDb?.moves | []);
           this.games.push(game);
         }
 
