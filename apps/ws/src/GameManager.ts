@@ -41,7 +41,6 @@ export class GameManager {
     }
 
     this.users = this.users.filter((user) => user.socket !== socket);
-    console.log("remove User called");
     SocketManager.getInstance().removeUser(user);
   }
 

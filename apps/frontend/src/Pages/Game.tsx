@@ -1,6 +1,6 @@
 /* eslint-disable no-case-declarations */
 import { useEffect, useState } from "react";
-import MoveSound from "../../public/MoveSound.mp3";
+import MoveSound from "/MoveSound.mp3";
 import ChessBoard, { isPromoting } from "../Components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
 import { Chess, Square } from "chess.js";
@@ -57,6 +57,12 @@ const Game = () => {
   const [moves, setMoves] = useState<Move[]>([]);
   const [myTimer, setMyTimer] = useState(10 * 60 * 1000);
   const [opponentTimer, setOpponentTimer] = useState(10 * 60 * 1000);
+
+  useEffect(() => {
+    window.addEventListener("beforeunload", function (e) {
+      e.preventDefault();
+    });
+  }, []);
 
   useEffect(() => {
     if (!socket) {
@@ -243,7 +249,7 @@ const Game = () => {
               </div>
             </div>
 
-            <div className="col-span-2 bg-gray-600 w-full rounded flex px-3 py-3">
+            <div className="col-span-2 bg-gray-600 w-full rounded flex px-3 py-3 h-[70vh] max-h-[40rem] overflow-y-auto">
               {!started && (
                 <div className="pt-8">
                   {added ? (

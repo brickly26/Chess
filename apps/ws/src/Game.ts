@@ -1,6 +1,12 @@
 import WebSocket from "ws";
 import { Chess, Square } from "chess.js";
-import { GAME_OVER, INIT_GAME, MOVE, USER_TIMEOUT } from "./messages";
+import {
+  GAME_OVER,
+  GAME_TIME,
+  INIT_GAME,
+  MOVE,
+  USER_TIMEOUT,
+} from "./messages";
 import { prisma } from "./db";
 import { randomUUID } from "crypto";
 import { SocketManager, User } from "./SocketManager";
@@ -213,7 +219,7 @@ export class Game {
     SocketManager.getInstance().broadcast(
       this.gameId,
       JSON.stringify({
-        type: "GAME_TIME",
+        type: GAME_TIME,
         payload: {
           player1UserId: this.player1UserId,
           player1Time: this.player1Time,

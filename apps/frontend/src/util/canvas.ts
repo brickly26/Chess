@@ -31,9 +31,16 @@ export const drawArrow = (
 
   ctx.beginPath();
   ctx.moveTo(startX, startY);
+  ctx.lineTo(startX, endY);
+  ctx.strokeStyle = "#ec923F";
+  ctx.lineWidth = 20;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(startX, endY);
   ctx.lineTo(endX, endY);
   ctx.strokeStyle = "#ec923F";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 20;
   ctx.stroke();
 
   const angle = Math.atan2(endY - startY, endX - startX);
@@ -49,6 +56,6 @@ export const drawArrow = (
   ctx.moveTo(endX, endY);
   ctx.lineTo(arrowheadX2, arrowheadY2);
   ctx.strokeStyle = "#EC923F";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 20;
   ctx.stroke();
 };

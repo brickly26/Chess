@@ -1,15 +1,15 @@
+/* eslint-disable react-refresh/only-export-components */
 import { Chess, Color, PieceSymbol, Square } from "chess.js";
 import { useState, MouseEvent } from "react";
 import { MOVE, Move } from "../Pages/Game";
-import { algebraicToIndices, isArrayInNestedArray } from "../util/functions";
 import useWindowSize from "../hooks/useWindowSize";
-import MoveSound from "../../public/MoveSound.mp3";
-import CaptureSound from "../../public/capture.wav";
+import MoveSound from "/MoveSound.mp3";
+import CaptureSound from "/capture.wav";
 import { drawArrow } from "../util/canvas";
 import NumberNotation from "./chess-board/NumberNotation";
-import ChessSquare from "./chess-board/ChessSquare";
 import LetterNotation from "./chess-board/LetterNotation";
 import LegalMoveIndicator from "./chess-board/LegalMoveIndicator";
+import Confetti from "react-confetti";
 
 export const isPromoting = (chess: Chess, from: Square, to: Square) => {
   if (!from) {
@@ -91,6 +91,7 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
     width > height
       ? Math.floor((height - OFFSET) / 8)
       : Math.floor((width - OFFSET) / 8);
+  const [gameOver, setGameOver] = useState(false);
   const moveAudio = new Audio(MoveSound);
   const captureAudio = new Audio(CaptureSound);
 
@@ -149,66 +150,77 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
     }
   };
 
-  const handleDragStart = (
-    e: React.DragEvent,
-    square: Square,
-    pieceColor: Color
-  ) => {
-    e.dataTransfer.setData("text/plain", square);
-    if (!isMyTurn) return;
-    if (pieceColor !== chess.turn()) return;
-    validMoves(square);
-    setFrom(square);
-  };
+  // const handleDragStart = (
+  //   e: React.DragEvent,
+  //   square: Square,
+  //   pieceColor: Color
+  // ) => {
+  //   e.dataTransfer.setData("text/plain", square);
+  //   if (!isMyTurn) return;
+  //   if (pieceColor !== chess.turn()) return;
+  //   setLegalMoves(
+  //     chess
+  //       .moves({
+  //         verbose: true,
+  //         square: square,
+  //       })
+  //       .map((move) => move.to)
+  //   );
+  //   setFrom(square);
+  // };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
+  // const handleDragOver = (e: React.DragEvent) => {
+  //   e.preventDefault();
+  // };
 
-  const handleDrop = (e: React.DragEvent, to: Square) => {
-    e.preventDefault();
+  // const handleDrop = (e: React.DragEvent, to: Square) => {
+  //   e.preventDefault();
 
-    const square = algebraicToIndices(to, chess.turn());
+  //   const square = algebraicToIndices(to, chess.turn());
 
-    const isValidMove = isArrayInNestedArray(validSquares, square);
+  //   const isValidMove = isArrayInNestedArray(validSquares, square);
 
-    if (from && isValidMove) {
-      socket.send(
-        JSON.stringify({
-          type: MOVE,
-          payload: {
-            move: {
-              from,
-              to,
-            },
-          },
-        })
-      );
+  //   if (from && isValidMove) {
+  //     socket.send(
+  //       JSON.stringify({
+  //         type: MOVE,
+  //         payload: {
+  //           move: {
+  //             from,
+  //             to,
+  //           },
+  //         },
+  //       })
+  //     );
 
-      chess.move({
-        from,
-        to,
-      });
-      setBoard(chess.board());
-      setMoves([...moves, { from, to }]);
-    }
-    setFrom(null);
-    setValidSquares([]);
-  };
+  //     chess.move({
+  //       from,
+  //       to,
+  //     });
+  //     setBoard(chess.board());
+  //     setMoves([...moves, { from, to }]);
+  //   }
+  //   setFrom(null);
+  //   setValidSquares([]);
+  // };
 
-  const validMoves = (square: Square | null) => {
-    const moves = chess.moves({ square: square! });
+  // const validMoves = (square: Square | null) => {
+  //   const moves = chess.moves({ square: square! });
 
-    console.log(chess.moves({ square: square! }));
+  //   console.log(chess.moves({ square: square! }));
 
-    const moveIndices = moves.map((move) =>
-      algebraicToIndices(move, chess.turn())
-    );
-    setValidSquares(moveIndices);
-  };
+  //   const moveIndices = moves.map((move) =>
+  //     algebraicToIndices(move, chess.turn())
+  //   );
+  //   setValidSquares(moveIndices);
+  // };
+
+  console.log("from", from);
+  console.log("legalMoves", legalMoves);
 
   return (
     <>
+      {gameOver && <Confetti />}
       <div className="flex relative">
         <div className="text-white-200 mr-10 rounded-md overflow-hidden">
           {(isFlipped ? board.slice().reverse() : board).map((row, i) => {
@@ -226,11 +238,9 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
                     ? (i + j) % 2 === 0
                     : (i + j) % 2 !== 0;
 
-                  const squareRepresentation = (String.fromCharCode(
-                    97 + (j % 8)
-                  ) +
+                  const squareRepresentation = (String.fromCharCode(97 + j) +
                     "" +
-                    (8 - i)) as Square;
+                    i) as Square;
 
                   const isHighlightedSquare =
                     from === squareRepresentation ||
@@ -253,8 +263,8 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
                       onMouseUp={(e) => {
                         handleMouseUp(e, squareRepresentation);
                       }}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, squareRepresentation)}
+                      // onDragOver={handleDragOver}
+                      // onDrop={(e) => handleDrop(e, squareRepresentation)}
                       onClick={() => {
                         if (!started) {
                           return;
@@ -299,6 +309,9 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
                               if (moveResult.captured) {
                                 captureAudio.play();
                               }
+                              if (moveResult.san.includes("#")) {
+                                setGameOver(true);
+                              }
                             }
 
                             socket.send(
@@ -328,7 +341,25 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
                       }}
                     >
                       <div className="w-full justify-center flex h-full relative">
-                        {square && <ChessSquare square={square} />}
+                        {square && (
+                          <div className="h-full justify-center flex flex-col">
+                            {square ? (
+                              <img
+                                className="w-14"
+                                src={`/${square?.color === "b" ? `b${square.type}` : `w${square.type}`}.png`}
+                                alt=""
+                                // draggable={true}
+                                // onDragStart={(e) =>
+                                //   handleDragStart(
+                                //     e,
+                                //     square.square,
+                                //     square.color
+                                //   )
+                                // }
+                              />
+                            ) : null}
+                          </div>
+                        )}
                         {isFlipped
                           ? i === 8 && (
                               <LetterNotation
