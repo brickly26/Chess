@@ -1,13 +1,16 @@
 /* eslint-disable no-case-declarations */
-import { useEffect, useState } from "react";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { useEffect, useRef, useState } from "react";
 import MoveSound from "/MoveSound.mp3";
 import ChessBoard, { isPromoting } from "../Components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
-import { Chess, Square } from "chess.js";
+import { Chess, Move } from "chess.js";
 import { useNavigate, useParams } from "react-router-dom";
 import MoveTable from "../Components/MovesTable";
 import { useUser } from "@repo/store/useUser";
 import { UserAvatar } from "../Components/UserAvatar";
+import { useRecoilValue, useSetRecoilState } from "recoil";
+import { movesAtom, userSelectedMoveIndexAtom } from "@repo/store/chessBoard";
 
 // TODO: Move together, there's code repetition here
 export const INIT_GAME = "init_game";
@@ -20,6 +23,20 @@ export const GAME_ALERT = "game_alert";
 export const GAME_ADDED = "game_added";
 export const USER_TIMEOUT = "user_timeout";
 export const GAME_TIME = "game_time";
+export const GAME_ENDED = "game_ended";
+
+export enum Result {
+  WHITE_WINS = "WHITE_WINS",
+  BLACK_WINS = "BLACK_WINS",
+  DRAW = "DRAW",
+}
+
+export interface GameResult {
+  result: Result;
+  by: string;
+}
+
+const GAME_TIME_MS = 10 * 60 * 1000;
 
 interface Metadata {
   blackPlayer: { id: string; name: string };
@@ -27,11 +44,6 @@ interface Metadata {
 }
 
 const moveAudio = new Audio(MoveSound);
-
-export interface Move {
-  from: Square;
-  to: Square;
-}
 
 const Game = () => {
   const socket = useSocket();
@@ -46,23 +58,23 @@ const Game = () => {
   const [added, setAdded] = useState(false);
   const [started, setStarted] = useState(false);
   const [gameMetadata, setGameMetadata] = useState<Metadata | null>(null);
-  const [result, setResult] = useState<
-    | "WHITE_WINS"
-    | "BLACK_WINS"
-    | "DRAW"
-    | typeof OPPONENT_DISCONNECTED
-    | typeof USER_TIMEOUT
-    | null
-  >(null);
-  const [moves, setMoves] = useState<Move[]>([]);
-  const [myTimer, setMyTimer] = useState(10 * 60 * 1000);
-  const [opponentTimer, setOpponentTimer] = useState(10 * 60 * 1000);
+  const [result, setResult] = useState<GameResult | null>(null);
+  const [player1TimeConsumed, setPlayer1TimeConsumed] = useState(0);
+  const [player2TimeConsumed, setPlayer2TimeConsumed] = useState(0);
+
+  const setMoves = useSetRecoilState(movesAtom);
+  const userSelectedMoveIndex = useRecoilValue(userSelectedMoveIndexAtom);
+  const userSelectedMoveIndexRef = useRef(userSelectedMoveIndex);
 
   useEffect(() => {
-    window.addEventListener("beforeunload", function (e) {
-      e.preventDefault();
-    });
-  }, []);
+    userSelectedMoveIndexRef.current = userSelectedMoveIndex;
+  }, [userSelectedMoveIndex]);
+
+  useEffect(() => {
+    if (!user) {
+      window.location.href = "/login";
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!socket) {
@@ -71,8 +83,6 @@ const Game = () => {
 
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
-
-      console.log(message.type);
 
       switch (message.type) {
         case GAME_ADDED:
@@ -88,31 +98,58 @@ const Game = () => {
           });
           break;
         case MOVE:
-          const move = message.payload;
-          const moves = chess.moves({ verbose: true });
-          // TODO: fix later
-          if (
-            moves.map((x) => JSON.stringify(x)).includes(JSON.stringify(move))
-          )
+          const { move, player1TimeConsumed, player2TimeConsumed } =
+            message.payload;
+          setPlayer1TimeConsumed(player1TimeConsumed),
+            setPlayer2TimeConsumed(player2TimeConsumed);
+
+          if (userSelectedMoveIndexRef.current !== null) {
+            setMoves((moves) => [...moves, move]);
             return;
-          if (isPromoting(chess, move.from, move.to)) {
-            chess.move({
-              from: move.from,
-              to: move.to,
-              promotion: "q",
-            });
-          } else {
-            chess.move({ from: move.from, to: move.to });
           }
-          moveAudio.play();
-          setBoard(chess.board());
-          setMoves((moves) => [...moves, move]);
+
+          try {
+            if (isPromoting(chess, move.from, move.to)) {
+              chess.move({
+                from: move.from,
+                to: move.to,
+                promotion: "q",
+              });
+            } else {
+              chess.move({ from: move.from, to: move.to });
+            }
+            setMoves((moves) => [...moves, move]);
+            moveAudio.play();
+          } catch (error) {
+            console.log("Error", error);
+          }
           break;
         case GAME_OVER:
           setResult(message.payload.result);
           break;
-        case OPPONENT_DISCONNECTED:
-          setResult(OPPONENT_DISCONNECTED);
+
+        case GAME_ENDED:
+          const wonBy =
+            message.payload.status === "COMPLETED"
+              ? message.payload.result !== "DRAW"
+                ? "CheckMate"
+                : "Draw"
+              : "Timeout";
+          setResult({
+            result: message.payload.result,
+            by: wonBy,
+          });
+          chess.reset();
+          setMoves(() => {
+            message.payload.moves.map((curr_move: Move) => {
+              chess.move(curr_move as Move);
+            });
+            return message.payload.moves;
+          });
+          setGameMetadata({
+            blackPlayer: message.player.blackPlayer,
+            whitePlayer: message.player.whitePlayer,
+          });
           break;
 
         case USER_TIMEOUT:
@@ -124,8 +161,11 @@ const Game = () => {
             blackPlayer: message.payload.blackPlayer,
             whitePlayer: message.payload.whitePlayer,
           });
+          setPlayer1TimeConsumed(message.payload.player1TimeConsumed);
+          setPlayer2TimeConsumed(message.payload.player2TimeConsumed);
+          console.log(message.payload);
           setStarted(true);
-          setMoves(message.payload.moves);
+
           message.payload.moves.map((x: Move) => {
             if (isPromoting(chess, x.from, x.to)) {
               chess.move({ ...x, promotion: "q" });
@@ -133,18 +173,13 @@ const Game = () => {
               chess.move(x);
             }
           });
-          setBoard(chess.board());
-          break;
-        case GAME_TIME:
-          if (message.payload.player2UserId === user.id) {
-            setMyTimer(message.payload.player2Time);
-            setOpponentTimer(message.payload.player1Time);
-          } else {
-            setMyTimer(message.payload.player1Time);
-            setOpponentTimer(message.payload.player2Time);
-          }
+          setMoves(message.payload.moves);
           break;
 
+        case GAME_TIME:
+          setPlayer1TimeConsumed(message.payload.player1Time);
+          setPlayer2TimeConsumed(message.payload.player2Time);
+          break;
         default:
           alert(message.payload.message);
           break;
@@ -166,22 +201,20 @@ const Game = () => {
   useEffect(() => {
     if (started) {
       const interval = setInterval(() => {
-        if (
-          user.id === gameMetadata?.blackPlayer?.id ? "b" : "w" === chess.turn()
-        ) {
-          setMyTimer((myTimer) => myTimer - 100);
+        if (chess.turn() === "w") {
+          setPlayer1TimeConsumed((p) => p + 100);
         } else {
-          setOpponentTimer((opponentTimer) => opponentTimer - 100);
+          setPlayer2TimeConsumed((p) => p + 100);
         }
       }, 100);
-
       return () => clearInterval(interval);
     }
-  }, [started]);
+  }, [started, gameMetadata, user]);
 
-  const getTimer = (tempTime: number) => {
-    const minutes = Math.floor(tempTime / (1000 * 60));
-    const remainingSeconds = Math.floor((tempTime % (1000 * 60)) / 1000);
+  const getTimer = (tempConsumed: number) => {
+    const timeLeftMs = GAME_TIME_MS - player1TimeConsumed;
+    const minutes = Math.floor(timeLeftMs / (1000 * 60));
+    const remainingSeconds = Math.floor((timeLeftMs % (1000 * 60)) / 1000);
 
     return (
       <div className="text-white">
@@ -195,12 +228,13 @@ const Game = () => {
   if (!socket) return <div>Connecting...</div>;
 
   return (
+    // TODO: create a end Game modal here
     <div className="">
       {result && (
         <div className="justify-center flex pt-4 text-white">
-          {result === "WHITE_WINS" && "White wins"}
-          {result === "BLACK_WINS" && "Black wins"}
-          {result === "DRAW" && "Draw"}
+          {result.by === "WHITE_WINS" && "White wins"}
+          {result.by === "BLACK_WINS" && "Black wins"}
+          {result.by === "DRAW" && "Draw"}
         </div>
       )}
 
@@ -213,19 +247,31 @@ const Game = () => {
         </div>
       )}
       <div className="flex justify-center">
-        <div className="pt-2 max-w-screen-lg w-full">
-          <div className="grid grid-cols-7 gap-4 w-full">
-            <div className="col-span-7 lg:col-span-5 w-full text-white">
+        <div className="pt-2 w-full">
+          <div className="flex flex-wrap justify-around content-around w-full">
+            <div className="text-white">
               <div className="flex justify-center">
                 <div>
-                  <div className="mb-4 flex justify-between">
-                    <UserAvatar name={gameMetadata?.blackPlayer?.name ?? ""} />
-                    {getTimer(opponentTimer)}
+                  <div className="mb-4">
+                    {started && (
+                      <div>
+                        <UserAvatar
+                          name={
+                            user.id === gameMetadata?.whitePlayer?.id
+                              ? gameMetadata?.blackPlayer?.name
+                              : gameMetadata?.whitePlayer?.name ?? ""
+                          }
+                        />
+                        {getTimer(
+                          user.id === gameMetadata?.whitePlayer?.id
+                            ? player2TimeConsumed
+                            : player1TimeConsumed
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div>
-                    <div
-                      className={`col-span-4 w-full flex justify-center text-white ${(result === OPPONENT_DISCONNECTED || result === USER_TIMEOUT) && "pointer-events-none"}`}
-                    >
+                    <div className={`w-full flex justify-center text-white`}>
                       <ChessBoard
                         started={started}
                         gameId={gameId ?? ""}
@@ -236,22 +282,32 @@ const Game = () => {
                         board={board}
                         setBoard={setBoard}
                         chess={chess}
-                        setMoves={setMoves}
-                        moves={moves}
                       />
                     </div>
                   </div>
-                  <div className="mb-4 flex justify-between">
-                    <UserAvatar name={gameMetadata?.blackPlayer?.name ?? ""} />
-                    {getTimer(myTimer)}
-                  </div>
+                  {started && (
+                    <div className="mb-4 flex justify-between">
+                      <UserAvatar
+                        name={
+                          user.id === gameMetadata?.blackPlayer?.id
+                            ? gameMetadata?.blackPlayer?.name
+                            : gameMetadata?.whitePlayer?.name ?? ""
+                        }
+                      />
+                      {getTimer(
+                        user.id === gameMetadata?.blackPlayer?.id
+                          ? player2TimeConsumed
+                          : player1TimeConsumed
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="col-span-2 bg-gray-600 w-full rounded flex px-3 py-3 h-[70vh] max-h-[40rem] overflow-y-auto">
+            <div className="rounded-md bg-gray-600 overflow-auto h-[90vh] mt-10">
               {!started && (
-                <div className="pt-8">
+                <div className="pt-8 flex justify-center w-full">
                   {added ? (
                     <div>waiting...</div>
                   ) : (
@@ -273,11 +329,9 @@ const Game = () => {
                   )}
                 </div>
               )}
-              {moves.length > 0 && (
-                <div className="w-full">
-                  <MoveTable moves={moves} />
-                </div>
-              )}
+              <div>
+                <MoveTable />
+              </div>
             </div>
           </div>
         </div>

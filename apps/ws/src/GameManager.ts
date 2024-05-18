@@ -4,8 +4,6 @@ import {
   INIT_GAME,
   JOIN_GAME,
   MOVE,
-  OPPONENT_DISCONNECTED,
-  JOIN_ROOM,
   GAME_JOINED,
   GAME_NOT_FOUND,
   GAME_ALERT,
@@ -107,7 +105,7 @@ export class GameManager {
           return;
         }
 
-        const availableGame = this.games.find((game) => game.gameId === gameId);
+        let availableGame = this.games.find((game) => game.gameId === gameId);
 
         const gameFromDb = await prisma.game.findUnique({
           where: {
@@ -162,8 +160,9 @@ export class GameManager {
             gameFromDb.id,
             gameFromDb.startAt
           );
-          game.seedMoves(gameFromDb?.moves | []);
+          game.seedMoves(gameFromDb?.moves || []);
           this.games.push(game);
+          availableGame = game;
         }
 
         user.socket.send(
@@ -180,6 +179,8 @@ export class GameManager {
                 id: gameFromDb?.blackPlayerId,
                 name: gameFromDb?.whitePlayer.name,
               },
+              player1TimeConsumed: availableGame.getPlayer1TimeConsumed(),
+              player2TimeConsumed: availableGame.getPlayer2TimeConsumed(),
             },
           })
         );

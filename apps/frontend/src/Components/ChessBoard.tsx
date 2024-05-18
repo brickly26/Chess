@@ -41,8 +41,8 @@ interface ChessBoardProps {
   gameId: string;
   started: boolean;
   chess: Chess;
-  moves: Move[];
-  setMoves: React.Dispatch<React.SetStateAction<Move[]>>;
+  // moves: Move[];
+  // setMoves: React.Dispatch<React.SetStateAction<Move[]>>;
   socket: WebSocket;
   board: ({
     square: Square;
@@ -68,8 +68,8 @@ const ChessBoard: React.FC<ChessBoardProps> = ({
   socket,
   chess,
   setBoard,
-  setMoves,
-  moves,
+  // setMoves,
+  // moves,
 }) => {
   const { height, width } = useWindowSize();
   const [lastMoveFrom, lastMoveTo] = [
