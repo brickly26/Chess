@@ -1,5 +1,4 @@
-const calculateX = (square: string, isFlipped: boolean) => {
-  const squareSize = 64;
+const calculateX = (square: string, isFlipped: boolean, squareSize: number) => {
   let columnIndex = square.charCodeAt(0) - "a".charCodeAt(0);
   if (isFlipped) {
     columnIndex = 7 - columnIndex;
@@ -8,8 +7,7 @@ const calculateX = (square: string, isFlipped: boolean) => {
   return columnIndex * squareSize + squareSize / 2;
 };
 
-const calculateY = (square: string, isFlipped: boolean) => {
-  const squareSize = 64;
+const calculateY = (square: string, isFlipped: boolean, squareSize: number) => {
   let rowIndex = 8 - parseInt(square[1]);
   if (isFlipped) {
     rowIndex = 7 - rowIndex;
@@ -18,33 +16,33 @@ const calculateY = (square: string, isFlipped: boolean) => {
   return rowIndex * squareSize + squareSize / 2;
 };
 
-export const drawArrow = (
-  ctx: CanvasRenderingContext2D,
-  start: string,
-  end: string,
-  isFlipped: boolean
-) => {
-  const startX = calculateX(start, isFlipped);
-  const startY = calculateY(start, isFlipped);
-  const endX = calculateX(end, isFlipped);
-  const endY = calculateY(end, isFlipped);
+export const drawArrow = ({
+  ctx,
+  start,
+  end,
+  isFlipped,
+  squareSize,
+}: {
+  ctx: CanvasRenderingContext2D;
+  start: string;
+  end: string;
+  isFlipped: boolean;
+  squareSize: number;
+}) => {
+  const startX = calculateX(start, isFlipped, squareSize);
+  const startY = calculateY(start, isFlipped, squareSize);
+  const endX = calculateX(end, isFlipped, squareSize);
+  const endY = calculateY(end, isFlipped, squareSize);
 
   ctx.beginPath();
   ctx.moveTo(startX, startY);
-  ctx.lineTo(startX, endY);
-  ctx.strokeStyle = "#ec923F";
-  ctx.lineWidth = 20;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(startX, endY);
   ctx.lineTo(endX, endY);
   ctx.strokeStyle = "#ec923F";
-  ctx.lineWidth = 20;
+  ctx.lineWidth = 10;
   ctx.stroke();
 
   const angle = Math.atan2(endY - startY, endX - startX);
-  const arrowheadSize = 15;
+  const arrowheadSize = 10;
   const arrowheadX1 = endX - arrowheadSize * Math.cos(angle - Math.PI / 6);
   const arrowheadY1 = endY - arrowheadSize * Math.sin(angle - Math.PI / 6);
   const arrowheadX2 = endX - arrowheadSize * Math.cos(angle - Math.PI / 6);
@@ -56,6 +54,6 @@ export const drawArrow = (
   ctx.moveTo(endX, endY);
   ctx.lineTo(arrowheadX2, arrowheadY2);
   ctx.strokeStyle = "#EC923F";
-  ctx.lineWidth = 20;
+  ctx.lineWidth = 10;
   ctx.stroke();
 };
