@@ -40,7 +40,7 @@ const MovesTable = () => {
   }, [moves]);
 
   return (
-    <div className="text-[#C3C3CO relative w-full">
+    <div className="text-[#C3C3CO] relative w-full">
       <div
         className="text-sm h-[45vh] max-h-[45vh] overflow-y-auto"
         ref={movesTableRef}

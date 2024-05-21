@@ -2,13 +2,13 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useRef, useState } from "react";
 import MoveSound from "/MoveSound.mp3";
-import ChessBoard, { isPromoting } from "../Components/ChessBoard";
+import ChessBoard, { isPromoting } from "../components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
 import { Chess, Move } from "chess.js";
 import { useNavigate, useParams } from "react-router-dom";
-import MoveTable from "../Components/MovesTable";
+import MoveTable from "../components/MovesTable";
 import { useUser } from "@repo/store/useUser";
-import { UserAvatar } from "../Components/UserAvatar";
+import { UserAvatar } from "../components/UserAvatar";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import { movesAtom, userSelectedMoveIndexAtom } from "@repo/store/chessBoard";
 
@@ -237,24 +237,15 @@ const Game = () => {
           {result.by === "DRAW" && "Draw"}
         </div>
       )}
-
-      {started && (
-        <div className="justify-center flex pt-4 text-white">
-          {(user.id === gameMetadata?.blackPlayer?.id ? "b" : "w") ===
-          chess.turn()
-            ? "Your turn"
-            : "Opponent's turn"}
-        </div>
-      )}
       <div className="flex justify-center">
         <div className="pt-2 w-full">
           <div className="flex flex-wrap justify-around content-around w-full">
             <div className="text-white">
               <div className="flex justify-center">
                 <div>
-                  <div className="mb-4">
+                  <div className="mb-2">
                     {started && (
-                      <div>
+                      <div className="flex justify-between items-center h-10 font-semibold">
                         <UserAvatar
                           name={
                             user.id === gameMetadata?.whitePlayer?.id
@@ -262,6 +253,13 @@ const Game = () => {
                               : gameMetadata?.whitePlayer?.name ?? ""
                           }
                         />
+                        <div className="justify-center flex text-white">
+                          {(user.id === gameMetadata?.blackPlayer?.id
+                            ? "b"
+                            : "w") === chess.turn()
+                            ? "Your turn"
+                            : "Opponent's turn"}
+                        </div>
                         {getTimer(
                           user.id === gameMetadata?.whitePlayer?.id
                             ? player2TimeConsumed
@@ -286,7 +284,7 @@ const Game = () => {
                     </div>
                   </div>
                   {started && (
-                    <div className="mb-4 flex justify-between">
+                    <div className="flex justify-between items-center mt-2 h-10 font-semibold">
                       <UserAvatar
                         name={
                           user.id === gameMetadata?.blackPlayer?.id
@@ -313,9 +311,8 @@ const Game = () => {
                   ) : (
                     gameId === "random" && (
                       <button
-                        className="bg-[#B48764] text-2xl hover:bg-[#bf9b80] text-white font-bold py-4 w-full mx-4 rounded"
+                        className="bg-[#B48764] text-2xl hover:bg-[#bf9b80] text-white font-bold px-8 py-4 w-full rounded"
                         onClick={() => {
-                          setStarted(true);
                           socket.send(
                             JSON.stringify({
                               type: INIT_GAME,
