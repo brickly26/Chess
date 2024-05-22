@@ -30,10 +30,12 @@ export const MobileSidebar = () => {
           className="w-36 text-muted-foreground flex flex-col h-full justify-between"
         >
           <div className="flex flex-col justify-start">
-            <h1 className="text-center text-white">Chess</h1>
+            <h1 className="text-center text-white text-2xl font-bold tracking-tighter ">
+              Chess
+            </h1>
             <SideNav items={UpperNavItems} setOpen={setOpen} />
           </div>
-          <div>
+          <div className="flex flex-col justify-end mb-2">
             <SideNav items={LowerNavItems} setOpen={setOpen} />
           </div>
         </SheetContent>

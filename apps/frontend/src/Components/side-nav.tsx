@@ -18,7 +18,7 @@ export interface NavItem {
   href: string;
   icon: LucideIcon;
   color?: string;
-  isChildren?: boolean;
+  isChidren?: boolean;
   children?: NavItem[];
 }
 
@@ -47,7 +47,7 @@ export function SideNav({ items, setOpen, className }: SideNavProps) {
   return (
     <nav className="dark">
       {items.map((item) =>
-        item.isChildren ? (
+        item.isChidren ? (
           <Accordion
             type="single"
             collapsible
@@ -56,11 +56,11 @@ export function SideNav({ items, setOpen, className }: SideNavProps) {
             value={openItem}
             onValueChange={setOpenItem}
           >
-            <AccordionItem value={item.title} className="border-none">
+            <AccordionItem value={item.title} className="border-none ">
               <AccordionTrigger
                 className={cn(
                   buttonVariants({ variant: "ghost" }),
-                  "group relative flex h-12 justify-between px-4 py-2 text-base duration-200 hover:200 hover:bg-muted hover:no-underline"
+                  "group relative flex h-12 justify-between px-4 py-2 text-base duration-200 hover:bg-muted hover:no-underline"
                 )}
               >
                 <div>
@@ -68,7 +68,7 @@ export function SideNav({ items, setOpen, className }: SideNavProps) {
                 </div>
                 <div
                   className={cn(
-                    "absolute left-12 text-base duration-200",
+                    "absolute left-12 text-base duration-200 ",
                     !isOpen && className
                   )}
                 >
@@ -124,7 +124,14 @@ export function SideNav({ items, setOpen, className }: SideNavProps) {
               onClick={() => {
                 if (setOpen) setOpen(false);
               }}
+              className={cn(
+                buttonVariants({ variant: "ghost" }),
+                "group relative flex h-12 justify-start",
+                location.pathname === item.href &&
+                  "bg-muted font-bold hover:bg-muted"
+              )}
             >
+              <item.icon className={cn("h-5 w-5", item.color)} />
               <span
                 className={cn(
                   "absolute left-12 text-base duration-200",

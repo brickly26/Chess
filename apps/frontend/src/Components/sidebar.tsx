@@ -10,7 +10,6 @@ interface SidebarProps {
 
 export default function Sidebar({ className }: SidebarProps) {
   const { isOpen, toggle } = useSidebar();
-
   useEffect(() => {
     const handleResize = () => {
       const screenWidth = window.innerWidth;
@@ -20,7 +19,7 @@ export default function Sidebar({ className }: SidebarProps) {
           toggle();
         }
       } else {
-        if (!open) {
+        if (!isOpen) {
           toggle();
         }
       }
@@ -33,31 +32,30 @@ export default function Sidebar({ className }: SidebarProps) {
       window.removeEventListener("resize", handleResize);
     };
   }, [isOpen, toggle]);
-
   return (
     <nav
       className={cn(
-        "relative hidden h-screen pt-4 md:block bg-stone-800 text-muted-foreground w-12 lg:w-36",
+        `relative hidden h-screen pt-4 md:block bg-stone-800 text-muted-foreground w-12 lg:w-36`,
         className
       )}
     >
       <div className="flex flex-col h-full justify-between">
         <div className="flex flex-col justify-start">
           {isOpen && (
-            <span className="text-center text-white text-2xl font-bold tracking-tighter">
+            <span className="text-center text-white text-2xl font-bold tracking-tighter ">
               Chess
             </span>
           )}
 
           <SideNav
-            className="text-background opacity-0 transition-all duration-300 group-hover:z-50 group-hover:rounded group-hover:bg-foreground group-hover:opacity-100"
+            className="text-background opacity-0 transition-all duration-300 group-hover:z-50  group-hover:rounded group-hover:bg-foreground  group-hover:opacity-100"
             items={UpperNavItems}
           />
         </div>
 
         <div className="flex flex-col justify-end mb-2">
           <SideNav
-            className="text-background opacity-0 transition-all duration-300 group-hover:z-50 group-hover:rounded group-hover:bg-foreground group-hover:opacity-100"
+            className="text-background opacity-0 transition-all duration-300 group-hover:z-50  group-hover:rounded group-hover:bg-foreground  group-hover:opacity-100"
             items={LowerNavItems}
           />
         </div>
