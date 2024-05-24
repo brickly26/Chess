@@ -38,9 +38,8 @@ const MovesTable = () => {
       });
     }
   }, [moves]);
-
   return (
-    <div className="text-[#C3C3CO] relative w-full">
+    <div className="text-[#C3C3C0] relative w-full ">
       <div
         className="text-sm h-[45vh] max-h-[45vh] overflow-y-auto"
         ref={movesTableRef}
@@ -67,7 +66,7 @@ const MovesTable = () => {
                   return (
                     <div
                       key={movePairIndex}
-                      className={`col-span-2 cursor-pointer flex items-center w-full pl-1 ${isHighlighted ? "bg-[#484644] rounded border-b-[3px]" : ""}`}
+                      className={`col-span-2 cursor-pointer flex items-center w-full pl-1 ${isHighlighted ? "bg-[#484644] rounded border-b-[#5A5858] border-b-[3px]" : ""}`}
                       onClick={() => {
                         setUserSelectedMoveIndex(index * 2 + movePairIndex);
                       }}
@@ -113,11 +112,9 @@ const MovesTable = () => {
               }}
               disabled={userSelectedMoveIndex === 0}
               className="hover:text-white"
-              title="Previous move"
             >
               <ChevronLeft />
             </button>
-
             <button
               onClick={() => {
                 setUserSelectedMoveIndex((prev) =>
@@ -130,11 +127,9 @@ const MovesTable = () => {
               }}
               disabled={userSelectedMoveIndex === null}
               className="hover:text-white"
-              title="Next move"
             >
               <ChevronRight />
             </button>
-
             <button
               onClick={() => {
                 setUserSelectedMoveIndex(moves.length - 1);
@@ -145,7 +140,6 @@ const MovesTable = () => {
             >
               <ChevronLast />
             </button>
-
             <button
               onClick={() => {
                 setIsFlipped((prev) => !prev);

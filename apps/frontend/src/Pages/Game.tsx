@@ -1,16 +1,19 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useRef, useState } from "react";
-import MoveSound from "/MoveSound.mp3";
-import ChessBoard, { isPromoting } from "../components/ChessBoard";
+import MoveSound from "/move.wav";
+import { Button } from "../components/Button";
+import { isPromoting, ChessBoard } from "../components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
 import { Chess, Move } from "chess.js";
 import { useNavigate, useParams } from "react-router-dom";
-import MoveTable from "../components/MovesTable";
+import MovesTable from "../components/MovesTable";
 import { useUser } from "@repo/store/useUser";
 import { UserAvatar } from "../components/UserAvatar";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import { movesAtom, userSelectedMoveIndexAtom } from "@repo/store/chessBoard";
+import GameEndModal from "../components/GameEndModal";
+import { Waitopponent } from "../components/ui/waitopponent";
 
 // TODO: Move together, there's code repetition here
 export const INIT_GAME = "init_game";
@@ -80,10 +83,8 @@ const Game = () => {
     if (!socket) {
       return;
     }
-
-    socket.onmessage = (event) => {
+    socket.onmessage = function (event) {
       const message = JSON.parse(event.data);
-
       switch (message.type) {
         case GAME_ADDED:
           setAdded(true);
@@ -100,14 +101,12 @@ const Game = () => {
         case MOVE:
           const { move, player1TimeConsumed, player2TimeConsumed } =
             message.payload;
-          setPlayer1TimeConsumed(player1TimeConsumed),
-            setPlayer2TimeConsumed(player2TimeConsumed);
-
+          setPlayer1TimeConsumed(player1TimeConsumed);
+          setPlayer2TimeConsumed(player2TimeConsumed);
           if (userSelectedMoveIndexRef.current !== null) {
             setMoves((moves) => [...moves, move]);
             return;
           }
-
           try {
             if (isPromoting(chess, move.from, move.to)) {
               chess.move({
@@ -147,9 +146,10 @@ const Game = () => {
             return message.payload.moves;
           });
           setGameMetadata({
-            blackPlayer: message.player.blackPlayer,
-            whitePlayer: message.player.whitePlayer,
+            blackPlayer: message.payload.blackPlayer,
+            whitePlayer: message.payload.whitePlayer,
           });
+
           break;
 
         case USER_TIMEOUT:
@@ -163,7 +163,7 @@ const Game = () => {
           });
           setPlayer1TimeConsumed(message.payload.player1TimeConsumed);
           setPlayer2TimeConsumed(message.payload.player2TimeConsumed);
-          console.log(message.payload);
+          console.error(message.payload);
           setStarted(true);
 
           message.payload.moves.map((x: Move) => {
@@ -180,6 +180,7 @@ const Game = () => {
           setPlayer1TimeConsumed(message.payload.player1Time);
           setPlayer2TimeConsumed(message.payload.player2Time);
           break;
+
         default:
           alert(message.payload.message);
           break;
@@ -196,7 +197,7 @@ const Game = () => {
         })
       );
     }
-  }, [socket, chess]);
+  }, [chess, socket]);
 
   useEffect(() => {
     if (started) {
@@ -213,6 +214,9 @@ const Game = () => {
 
   const getTimer = (timeConsumed: number) => {
     const timeLeftMs = GAME_TIME_MS - timeConsumed;
+    if (timeLeftMs <= 0) {
+      return <div className="text-white">Time's up!</div>;
+    }
     const minutes = Math.floor(timeLeftMs / (1000 * 60));
     const remainingSeconds = Math.floor((timeLeftMs % (1000 * 60)) / 1000);
 
@@ -228,16 +232,15 @@ const Game = () => {
   if (!socket) return <div>Connecting...</div>;
 
   return (
-    // TODO: create a end Game modal here
     <div className="">
       {result && (
-        <div className="justify-center flex pt-4 text-white">
-          {result.by === "WHITE_WINS" && "White wins"}
-          {result.by === "BLACK_WINS" && "Black wins"}
-          {result.by === "DRAW" && "Draw"}
-        </div>
+        <GameEndModal
+          blackPlayer={gameMetadata?.blackPlayer}
+          whitePlayer={gameMetadata?.whitePlayer}
+          gameResult={result}
+        ></GameEndModal>
       )}
-      <div className="flex justify-center">
+      <div className="justify-center flex">
         <div className="pt-2 w-full">
           <div className="flex flex-wrap justify-around content-around w-full">
             <div className="text-white">
@@ -245,7 +248,7 @@ const Game = () => {
                 <div>
                   <div className="mb-2">
                     {started && (
-                      <div className="flex justify-between items-center h-10 font-semibold">
+                      <div className="flex justify-between items-center  h-10 font-semibold">
                         <UserAvatar
                           name={
                             user.id === gameMetadata?.whitePlayer?.id
@@ -253,13 +256,14 @@ const Game = () => {
                               : gameMetadata?.whitePlayer?.name ?? ""
                           }
                         />
-                        <div className="justify-center flex text-white">
+                        <div className="justify-center flex  text-white">
                           {(user.id === gameMetadata?.blackPlayer?.id
                             ? "b"
                             : "w") === chess.turn()
                             ? "Your turn"
                             : "Opponent's turn"}
                         </div>
+
                         {getTimer(
                           user.id === gameMetadata?.whitePlayer?.id
                             ? player2TimeConsumed
@@ -274,17 +278,17 @@ const Game = () => {
                         started={started}
                         gameId={gameId ?? ""}
                         myColor={
-                          user.id === gameMetadata?.blackPlayer.id ? "b" : "w"
+                          user.id === gameMetadata?.blackPlayer?.id ? "b" : "w"
                         }
+                        chess={chess}
+                        setBoard={setBoard}
                         socket={socket}
                         board={board}
-                        setBoard={setBoard}
-                        chess={chess}
                       />
                     </div>
                   </div>
                   {started && (
-                    <div className="flex justify-between items-center mt-2 h-10 font-semibold">
+                    <div className="mt- flex justify-between items-center mt-2 h-10 font-semibold">
                       <UserAvatar
                         name={
                           user.id === gameMetadata?.blackPlayer?.id
@@ -302,16 +306,16 @@ const Game = () => {
                 </div>
               </div>
             </div>
-
-            <div className="rounded-md bg-gray-600 overflow-auto h-[90vh] mt-10">
+            <div className="rounded-md bg-brown-500 overflow-auto h-[90vh] mt-10">
               {!started && (
                 <div className="pt-8 flex justify-center w-full">
                   {added ? (
-                    <div>waiting...</div>
+                    <div className="text-white">
+                      <Waitopponent />
+                    </div>
                   ) : (
                     gameId === "random" && (
-                      <button
-                        className="bg-[#B48764] text-2xl hover:bg-[#bf9b80] text-white font-bold px-8 py-4 w-full rounded"
+                      <Button
                         onClick={() => {
                           socket.send(
                             JSON.stringify({
@@ -321,13 +325,13 @@ const Game = () => {
                         }}
                       >
                         Play
-                      </button>
+                      </Button>
                     )
                   )}
                 </div>
               )}
               <div>
-                <MoveTable />
+                <MovesTable />
               </div>
             </div>
           </div>

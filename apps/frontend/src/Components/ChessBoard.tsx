@@ -1,24 +1,25 @@
-/* eslint-disable react-refresh/only-export-components */
 import { Chess, Color, Move, PieceSymbol, Square } from "chess.js";
-import { useState, MouseEvent, memo, useEffect } from "react";
+import { MouseEvent, memo, useEffect, useState } from "react";
 import { MOVE } from "../Pages/Game";
-import useWindowSize from "../hooks/useWindowSize";
-import MoveSound from "/MoveSound.mp3";
-import CaptureSound from "/capture.wav";
-import { drawArrow } from "../util/canvas";
-import NumberNotation from "./chess-board/NumberNotation";
 import LetterNotation from "./chess-board/LetterNotation";
 import LegalMoveIndicator from "./chess-board/LegalMoveIndicator";
+import ChessSquare from "./chess-board/ChessSquare";
+import NumberNotation from "./chess-board/NumberNotation";
+import { drawArrow } from "../util/canvas";
+import useWindowSize from "../hooks/useWindowSize";
 import Confetti from "react-confetti";
+import MoveSound from "/move.wav";
+import CaptureSound from "/capture.wav";
+
 import { useRecoilState } from "recoil";
+
 import {
   isBoardFlippedAtom,
   movesAtom,
   userSelectedMoveIndexAtom,
 } from "@repo/store/chessBoard";
-import ChessSquare from "./chess-board/ChessSquare";
 
-export const isPromoting = (chess: Chess, from: Square, to: Square) => {
+export function isPromoting(chess: Chess, from: Square, to: Square) {
   if (!from) {
     return false;
   }
@@ -41,32 +42,39 @@ export const isPromoting = (chess: Chess, from: Square, to: Square) => {
     .history({ verbose: true })
     .map((it) => it.to)
     .includes(to);
-};
-
-interface ChessBoardProps {
-  myColor: Color;
-  gameId: string;
-  started: boolean;
-  chess: Chess;
-  socket: WebSocket;
-  board: ({
-    square: Square;
-    type: PieceSymbol;
-    color: Color;
-  } | null)[][];
-  setBoard: React.Dispatch<
-    React.SetStateAction<
-      ({
-        square: Square;
-        type: PieceSymbol;
-        color: Color;
-      } | null)[][]
-    >
-  >;
 }
 
-const ChessBoard: React.FC<ChessBoardProps> = memo(
-  ({ started, gameId, myColor, board, socket, chess, setBoard }) => {
+export const ChessBoard = memo(
+  ({
+    gameId,
+    started,
+    myColor,
+    chess,
+    board,
+    socket,
+    setBoard,
+  }: {
+    myColor: Color;
+    gameId: string;
+    started: boolean;
+    chess: Chess;
+    setBoard: React.Dispatch<
+      React.SetStateAction<
+        ({
+          square: Square;
+          type: PieceSymbol;
+          color: Color;
+        } | null)[][]
+      >
+    >;
+    board: ({
+      square: Square;
+      type: PieceSymbol;
+      color: Color;
+    } | null)[][];
+    socket: WebSocket;
+  }) => {
+    console.log("chessboard reloaded");
     const { height, width } = useWindowSize();
 
     const [isFlipped, setIsFlipped] = useRecoilState(isBoardFlippedAtom);
@@ -190,6 +198,7 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
         });
         chess.load(move.after);
         setBoard(chess.board());
+        return;
       }
     }, [userSelectedMoveIndex]);
 
@@ -204,7 +213,7 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
       } else {
         setBoard(chess.board());
       }
-    });
+    }, [moves]);
 
     return (
       <>
@@ -230,7 +239,6 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
                       ) +
                         "" +
                         i) as Square;
-
                       const isHighlightedSquare =
                         from === squareRepresentation ||
                         squareRepresentation === lastMove?.from ||
@@ -246,18 +254,6 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
 
                       return (
                         <div
-                          key={j}
-                          style={{ width: boxSize, height: boxSize }}
-                          className={`${isRightClickedSquare ? (isMainBoxColor ? "bg-[#CF664E]" : "bg-[#E87764]") : isHighlightedSquare ? `${isMainBoxColor ? "bg-[#BBCB45]" : "bg-[#F4F687]"}` : isMainBoxColor ? "bg-[#B48764]" : "bg-[#F0D8B5]"} ${""}`}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                          }}
-                          onMouseDown={(e) => {
-                            handleMouseDown(e, squareRepresentation);
-                          }}
-                          onMouseUp={(e) => {
-                            handleMouseUp(e, squareRepresentation);
-                          }}
                           onClick={() => {
                             if (!started) {
                               return;
@@ -271,10 +267,9 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
                               setUserSelectedMoveIndex(null);
                               return;
                             }
-
                             if (!from && square?.color !== chess.turn()) return;
                             if (!isMyTurn) return;
-                            if (from !== squareRepresentation) {
+                            if (from != squareRepresentation) {
                               setFrom(squareRepresentation);
                               if (isPiece) {
                                 setLegalMoves(
@@ -289,7 +284,6 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
                             } else {
                               setFrom(null);
                             }
-
                             if (!isPiece) {
                               setLegalMoves([]);
                             }
@@ -321,7 +315,6 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
                                     to: squareRepresentation,
                                   });
                                 }
-
                                 if (moveResult) {
                                   moveAudio.play();
 
@@ -339,18 +332,30 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
                                       type: MOVE,
                                       payload: {
                                         gameId,
-                                        move: {
-                                          from,
-                                          to: squareRepresentation,
-                                        },
+                                        move: moveResult,
                                       },
                                     })
                                   );
                                 }
-                              } catch (error) {
-                                console.log("");
+                              } catch (e) {
+                                console.log("e", e);
                               }
                             }
+                          }}
+                          style={{
+                            width: boxSize,
+                            height: boxSize,
+                          }}
+                          key={j}
+                          className={`${isRightClickedSquare ? (isMainBoxColor ? "bg-[#CF664E]" : "bg-[#E87764]") : isKingInCheckSquare ? "bg-[#FF6347]" : isHighlightedSquare ? `${isMainBoxColor ? "bg-[#BBCB45]" : "bg-[#F4F687]"}` : isMainBoxColor ? "bg-[#739552]" : "bg-[#EBEDD0]"} ${""}`}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                          }}
+                          onMouseDown={(e) => {
+                            handleMouseDown(e, squareRepresentation);
+                          }}
+                          onMouseUp={(e) => {
+                            handleMouseUp(e, squareRepresentation);
                           }}
                         >
                           <div className="w-full justify-center flex h-full relative">
@@ -396,7 +401,9 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
               pointerEvents: "none",
             }}
             onContextMenu={(e) => e.preventDefault()}
-            onMouseDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => {
+              e.preventDefault();
+            }}
             onMouseUp={(e) => e.preventDefault()}
           ></canvas>
         </div>
@@ -404,5 +411,3 @@ const ChessBoard: React.FC<ChessBoardProps> = memo(
     );
   }
 );
-
-export default ChessBoard;
