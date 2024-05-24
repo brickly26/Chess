@@ -358,7 +358,7 @@ export const ChessBoard = memo(
                             handleMouseUp(e, squareRepresentation);
                           }}
                         >
-                          <div className="w-full justify-center flex h-full relative">
+                          <div className="w-full justify-center items-center flex h-full relative">
                             {square && <ChessSquare square={square} />}
                             {isFlipped
                               ? i === 8 && (

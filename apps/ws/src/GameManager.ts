@@ -4,6 +4,8 @@ import {
   INIT_GAME,
   JOIN_GAME,
   MOVE,
+  OPPONENT_DISCONNECTED,
+  JOIN_ROOM,
   GAME_JOINED,
   GAME_NOT_FOUND,
   GAME_ALERT,
@@ -34,18 +36,16 @@ export class GameManager {
 
   removeUser(socket: WebSocket) {
     const user = this.users.find((user) => user.socket === socket);
-
     if (!user) {
       console.error("User not found?");
       return;
     }
-
     this.users = this.users.filter((user) => user.socket !== socket);
     SocketManager.getInstance().removeUser(user);
   }
 
   removeGame(gameId: string) {
-    this.games = this.games.filter((game) => gameId !== game.gameId);
+    this.games = this.games.filter((g) => g.gameId !== gameId);
   }
 
   private addHandler(user: User) {
@@ -53,10 +53,9 @@ export class GameManager {
       const message = JSON.parse(data.toString());
       if (message.type === INIT_GAME) {
         if (this.pendingGameId) {
-          // start game
           const game = this.games.find((x) => x.gameId === this.pendingGameId);
           if (!game) {
-            console.log("Pending game not found?");
+            console.error("Pending game not found?");
             return;
           }
           if (user.userId === game.player1UserId) {
@@ -65,7 +64,7 @@ export class GameManager {
               JSON.stringify({
                 type: GAME_ALERT,
                 payload: {
-                  message: "Trying to connect with yourself?",
+                  message: "Trying to Connect with yourself?",
                 },
               })
             );
@@ -99,18 +98,15 @@ export class GameManager {
         }
       }
 
-      if (message.type === JOIN_GAME) {
+      if (message.type === JOIN_ROOM) {
         const gameId = message.payload?.gameId;
         if (!gameId) {
           return;
         }
 
         let availableGame = this.games.find((game) => game.gameId === gameId);
-
         const gameFromDb = await prisma.game.findUnique({
-          where: {
-            id: gameId,
-          },
+          where: { id: gameId },
           include: {
             moves: {
               orderBy: {
@@ -135,7 +131,7 @@ export class GameManager {
           user.socket.send(
             JSON.stringify({
               type: GAME_ENDED,
-              pyalod: {
+              payload: {
                 result: gameFromDb.result,
                 status: gameFromDb.status,
                 moves: gameFromDb.moves,
@@ -165,6 +161,9 @@ export class GameManager {
           availableGame = game;
         }
 
+        console.log(availableGame.getPlayer1TimeConsumed());
+        console.log(availableGame.getPlayer2TimeConsumed());
+
         user.socket.send(
           JSON.stringify({
             type: GAME_JOINED,
@@ -172,12 +171,12 @@ export class GameManager {
               gameId,
               moves: gameFromDb.moves,
               blackPlayer: {
-                id: gameFromDb?.blackPlayerId,
-                name: gameFromDb?.blackPlayer.name,
+                id: gameFromDb.blackPlayer.id,
+                name: gameFromDb.blackPlayer.name,
               },
               whitePlayer: {
-                id: gameFromDb?.blackPlayerId,
-                name: gameFromDb?.whitePlayer.name,
+                id: gameFromDb.whitePlayer.id,
+                name: gameFromDb.whitePlayer.name,
               },
               player1TimeConsumed: availableGame.getPlayer1TimeConsumed(),
               player2TimeConsumed: availableGame.getPlayer2TimeConsumed(),

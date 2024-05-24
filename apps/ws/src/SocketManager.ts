@@ -3,8 +3,8 @@ import { WebSocket } from "ws";
 
 export class User {
   public socket: WebSocket;
-  public userId: string;
   public id: string;
+  public userId: string;
 
   constructor(socket: WebSocket, userId: string) {
     this.socket = socket;
@@ -16,11 +16,11 @@ export class User {
 export class SocketManager {
   private static instance: SocketManager;
   private interestedSockets: Map<string, User[]>;
-  private userRoomMapping: Map<string, string>;
+  private userRoomMappping: Map<string, string>;
 
-  constructor() {
+  private constructor() {
     this.interestedSockets = new Map<string, User[]>();
-    this.userRoomMapping = new Map<string, string>();
+    this.userRoomMappping = new Map<string, string>();
   }
 
   static getInstance() {
@@ -37,7 +37,7 @@ export class SocketManager {
       ...(this.interestedSockets.get(roomId) || []),
       user,
     ]);
-    this.userRoomMapping.set(user.id, roomId);
+    this.userRoomMappping.set(user.userId, roomId);
   }
 
   broadcast(roomId: string, message: string) {
@@ -53,21 +53,17 @@ export class SocketManager {
   }
 
   removeUser(user: User) {
-    const roomId = this.userRoomMapping.get(user.id);
-
+    const roomId = this.userRoomMappping.get(user.userId);
     if (!roomId) {
-      console.log("User was not interest in any room?");
+      console.error("User was not interested in any room?");
       return;
     }
-    this.interestedSockets.set(
-      roomId,
-      (this.interestedSockets.get(roomId) || []).filter((u) => u !== user)
-    );
-
+    const room = this.interestedSockets.get(roomId) || [];
+    const remainingUsers = room.filter((u) => u.userId !== user.userId);
+    this.interestedSockets.set(roomId, remainingUsers);
     if (this.interestedSockets.get(roomId)?.length === 0) {
       this.interestedSockets.delete(roomId);
     }
-
-    this.userRoomMapping.delete(user.id);
+    this.userRoomMappping.delete(user.userId);
   }
 }

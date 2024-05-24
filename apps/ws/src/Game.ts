@@ -1,5 +1,5 @@
-import { Chess, Square, Move } from "chess.js";
-import { GAME_OVER, INIT_GAME, MOVE, GAME_ENDED } from "./messages";
+import { Chess, Move, Square } from "chess.js";
+import { GAME_ENDED, INIT_GAME, MOVE } from "./messages";
 import { prisma } from "./db";
 import { randomUUID } from "crypto";
 import { SocketManager, User } from "./SocketManager";
@@ -39,14 +39,14 @@ export class Game {
   public player1UserId: string;
   public player2UserId: string | null;
   public board: Chess;
-  public result: GAME_RESULT | null = null;
   private moveCount = 0;
-  private moveTimer: NodeJS.Timeout | null = null;
   private timer: NodeJS.Timeout | null = null;
-  private player1TimeConsumed: number = 0;
-  private player2TimeConsumed: number = 0;
-  private lastMoveTime: Date = new Date(Date.now());
-  private startTime: Date = new Date(Date.now());
+  private moveTimer: NodeJS.Timeout | null = null;
+  public result: GAME_RESULT | null = null;
+  private player1TimeConsumed = 0;
+  private player2TimeConsumed = 0;
+  private startTime = new Date(Date.now());
+  private lastMoveTime = new Date(Date.now());
 
   constructor(
     player1UserId: string,
@@ -57,7 +57,6 @@ export class Game {
     this.player1UserId = player1UserId;
     this.player2UserId = player2UserId;
     this.board = new Chess();
-    this.startTime = new Date();
     this.gameId = gameId ?? randomUUID();
     if (startTime) {
       this.startTime = startTime;
@@ -77,7 +76,8 @@ export class Game {
       createdAt: Date;
     }[]
   ) {
-    moves.forEach((move: { from: string; to: string }) => {
+    console.log(moves);
+    moves.forEach((move) => {
       if (isPromoting(this.board, move.from as Square, move.to as Square)) {
         this.board.move({
           from: move.from,
@@ -108,7 +108,6 @@ export class Game {
     this.resetAbandonTimer();
     this.resetMoveTimer();
   }
-
   async updateSecondPlayer(player2UserId: string) {
     this.player2UserId = player2UserId;
 
@@ -122,8 +121,8 @@ export class Game {
 
     try {
       await this.createGameInDb();
-    } catch (error) {
-      console.error(error);
+    } catch (e) {
+      console.error(e);
       return;
     }
 
@@ -194,19 +193,19 @@ export class Game {
         },
       }),
       prisma.game.update({
-        where: {
-          id: this.gameId,
-        },
         data: {
           currentFen: move.after,
+        },
+        where: {
+          id: this.gameId,
         },
       }),
     ]);
   }
 
   async makeMove(user: User, move: Move) {
-    // Validation (is it this players turn, is the move valid)
-    if (this.board.turn() === "w" && user.userId !== "this.player1UserId") {
+    // validate the type of move using zod
+    if (this.board.turn() === "w" && user.userId !== this.player1UserId) {
       return;
     }
 
@@ -236,12 +235,12 @@ export class Game {
           to: move.to,
         });
       }
-    } catch (error) {
-      console.log(error);
+    } catch (e) {
+      console.error("Error while making move");
       return;
     }
 
-    // flippped because move has already happened
+    // flipped because move has already happened
     if (this.board.turn() === "b") {
       this.player1TimeConsumed =
         this.player1TimeConsumed +
@@ -253,16 +252,13 @@ export class Game {
         this.player2TimeConsumed +
         (moveTimestamp.getTime() - this.lastMoveTime.getTime());
     }
-    // add move to db
-    await this.addMoveToDb(move, moveTimestamp);
 
-    // update Timer
+    await this.addMoveToDb(move, moveTimestamp);
     this.resetAbandonTimer();
     this.resetMoveTimer();
 
     this.lastMoveTime = moveTimestamp;
 
-    // Send the update
     SocketManager.getInstance().broadcast(
       this.gameId,
       JSON.stringify({
@@ -275,7 +271,6 @@ export class Game {
       })
     );
 
-    // Check if the game is over
     if (this.board.isGameOver()) {
       const result = this.board.isDraw()
         ? "DRAW"
@@ -325,6 +320,14 @@ export class Game {
     if (this.moveTimer) {
       clearTimeout(this.moveTimer);
     }
+    const turn = this.board.turn();
+    const timeLeft =
+      GAME_TIME_MS -
+      (turn === "w" ? this.player1TimeConsumed : this.player2TimeConsumed);
+
+    this.moveTimer = setTimeout(() => {
+      this.endGame("TIME_UP", turn === "b" ? "WHITE_WINS" : "BLACK_WINS");
+    }, timeLeft);
   }
 
   async endGame(status: GAME_STATUS, result: GAME_RESULT) {
@@ -366,7 +369,7 @@ export class Game {
         },
       })
     );
-
+    // clear timers
     this.clearTimer();
     this.clearMoveTimer();
   }

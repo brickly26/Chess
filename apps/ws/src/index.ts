@@ -10,7 +10,7 @@ const gameManager = new GameManager();
 
 wss.on("connection", function connection(ws, req) {
   //@ts-ignore
-  const token = url.parse(req.url, true).query.token as string;
+  const token: string = url.parse(req.url, true).query.token;
   const userId = extractUserId(token);
   gameManager.addUser(new User(ws, userId));
 
@@ -18,3 +18,5 @@ wss.on("connection", function connection(ws, req) {
     gameManager.removeUser(ws);
   });
 });
+
+console.log("done");
