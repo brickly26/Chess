@@ -1,178 +1,392 @@
-import WebSocket from "ws";
-import { Chess } from "chess.js";
-import { GAME_OVER, INIT_GAME, MOVE } from "./messages";
-import prisma from "./db";
+import { Chess, Move, Square } from "chess.js";
+import { GAME_ENDED, INIT_GAME, MOVE } from "./messages";
+import { prisma } from "./db";
+import { randomUUID } from "crypto";
+import { SocketManager, User } from "./SocketManager";
+import { AuthProvider } from "@prisma/client";
 
-export class Game {
-  public gameId: string | null = null;
-  public player1: WebSocket | null;
-  public player2: WebSocket | null;
-  public board: Chess;
-  private startTime: Date;
-  private moveCount = 0;
-  private failedDbMoves: {
-    moveNumber: number;
-    from: string;
-    to: string;
-    playedAt: Date;
-  }[] = [];
+type GAME_STATUS = "IN_PROGRESS" | "COMPLETED" | "ABANDONED" | "TIME_UP";
+type GAME_RESULT = "WHITE_WINS" | "BLACK_WINS" | "DRAW";
 
-  constructor(player1: WebSocket, player2: WebSocket | null) {
-    this.player1 = player1;
-    this.player2 = player2;
-    this.board = new Chess();
-    this.startTime = new Date();
+const GAME_TIME_MS = 10 * 60 * 60 * 1000;
+
+export function isPromoting(chess: Chess, from: Square, to: Square) {
+  if (!from) {
+    return false;
   }
 
-  async createGameHandler() {
-    await this.createGameInDb();
-    if (this.player1) {
-      this.player1.send(
-        JSON.stringify({
-          type: INIT_GAME,
-          payload: {
-            color: "white",
-          },
-        })
-      );
+  const piece = chess.get(from);
+
+  if (piece?.type !== "p") {
+    return false;
+  }
+
+  if (piece.color !== chess.turn()) {
+    return false;
+  }
+
+  if (!["1", "8"].some((it) => to.endsWith(it))) {
+    return false;
+  }
+
+  return chess
+    .moves({ square: from, verbose: true })
+    .map((it) => it.to)
+    .includes(to);
+}
+
+export class Game {
+  public gameId: string;
+  public player1UserId: string;
+  public player2UserId: string | null;
+  public board: Chess;
+  private moveCount = 0;
+  private timer: NodeJS.Timeout | null = null;
+  private moveTimer: NodeJS.Timeout | null = null;
+  public result: GAME_RESULT | null = null;
+  private player1TimeConsumed = 0;
+  private player2TimeConsumed = 0;
+  private startTime = new Date(Date.now());
+  private lastMoveTime = new Date(Date.now());
+
+  constructor(
+    player1UserId: string,
+    player2UserId: string | null,
+    gameId?: string,
+    startTime?: Date
+  ) {
+    this.player1UserId = player1UserId;
+    this.player2UserId = player2UserId;
+    this.board = new Chess();
+    this.gameId = gameId ?? randomUUID();
+    if (startTime) {
+      this.startTime = startTime;
+      this.lastMoveTime = startTime;
     }
-    if (this.player2) {
-      this.player2.send(
-        JSON.stringify({
-          type: INIT_GAME,
-          payload: {
-            color: "black",
-          },
-        })
-      );
+  }
+
+  seedMoves(
+    moves: {
+      id: string;
+      gameId: string;
+      moveNumber: number;
+      from: string;
+      to: string;
+      comments: string | null;
+      timeTaken: number | null;
+      createdAt: Date;
+    }[]
+  ) {
+    console.log(moves);
+    moves.forEach((move) => {
+      if (isPromoting(this.board, move.from as Square, move.to as Square)) {
+        this.board.move({
+          from: move.from,
+          to: move.to,
+          promotion: "q",
+        });
+      } else {
+        this.board.move({
+          from: move.from,
+          to: move.to,
+        });
+      }
+    });
+    this.moveCount = moves.length;
+    if (moves[moves.length - 1]) {
+      this.lastMoveTime = moves[moves.length - 1].createdAt;
     }
+
+    moves.map((move, index) => {
+      if (move.timeTaken) {
+        if (index % 2 === 0) {
+          this.player1TimeConsumed += move.timeTaken;
+        } else {
+          this.player2TimeConsumed += move.timeTaken;
+        }
+      }
+    });
+    this.resetAbandonTimer();
+    this.resetMoveTimer();
+  }
+  async updateSecondPlayer(player2UserId: string) {
+    this.player2UserId = player2UserId;
+
+    const users = await prisma.user.findMany({
+      where: {
+        id: {
+          in: [this.player1UserId, this.player2UserId ?? ""],
+        },
+      },
+    });
+
+    try {
+      await this.createGameInDb();
+    } catch (e) {
+      console.error(e);
+      return;
+    }
+
+    let WhitePlayer = users.find((user) => user.id === this.player1UserId);
+    let BlackPlayer = users.find((user) => user.id === this.player2UserId);
+
+    SocketManager.getInstance().broadcast(
+      this.gameId,
+      JSON.stringify({
+        type: INIT_GAME,
+        payload: {
+          gameId: this.gameId,
+          whitePlayer: {
+            name: WhitePlayer?.name,
+            id: this.player1UserId,
+          },
+          blackPlayer: {
+            name: BlackPlayer?.name,
+            id: this.player2UserId,
+          },
+          fen: this.board.fen(),
+          moves: [],
+        },
+      })
+    );
   }
 
   async createGameInDb() {
-    try {
-      const game = await prisma.game.create({
-        data: {
-          playerWhite: {
-            create: {},
-          },
-          playerBlack: {
-            create: {},
+    this.startTime = new Date(Date.now());
+    this.lastMoveTime = this.startTime;
+
+    const game = await prisma.game.create({
+      data: {
+        id: this.gameId,
+        timeControl: "CLASSICAL",
+        status: "IN_PROGRESS",
+        startAt: this.startTime,
+        currentFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        whitePlayer: {
+          connect: {
+            id: this.player1UserId,
           },
         },
-        include: {
-          playerWhite: true,
-          playerBlack: true,
+        blackPlayer: {
+          connect: {
+            id: this.player2UserId ?? "",
+          },
         },
-      });
-      this.gameId = game.id;
-    } catch (error) {}
+      },
+      include: {
+        whitePlayer: true,
+        blackPlayer: true,
+      },
+    });
+    this.gameId = game.id;
   }
 
-  async addMoveToDb(move: { from: string; to: string }) {
-    if (this.gameId) {
-      try {
-        await prisma.move.create({
-          data: {
-            gameId: this.gameId,
-            moveNumber: this.moveCount + 1,
-            from: move.from,
-            to: move.to,
-          },
-        });
-      } catch (error) {
-        this.failedDbMoves.push({
+  async addMoveToDb(move: Move, moveTimestamp: Date) {
+    await prisma.$transaction([
+      prisma.move.create({
+        data: {
+          gameId: this.gameId,
           moveNumber: this.moveCount + 1,
           from: move.from,
           to: move.to,
-          playedAt: new Date(Date.now()),
-        });
-      }
-    }
+          before: move.before,
+          after: move.after,
+          createdAt: moveTimestamp,
+          timeTaken: moveTimestamp.getTime() - this.lastMoveTime.getTime(),
+          san: move.san,
+        },
+      }),
+      prisma.game.update({
+        data: {
+          currentFen: move.after,
+        },
+        where: {
+          id: this.gameId,
+        },
+      }),
+    ]);
   }
 
-  async makeMove(socket: WebSocket, move: { from: string; to: string }) {
-    // Validate type of move using zod
+  async makeMove(user: User, move: Move) {
+    // validate the type of move using zod
+    if (this.board.turn() === "w" && user.userId !== this.player1UserId) {
+      return;
+    }
 
-    // Validation (is it this players turn, is the move valid)
-    if (this.moveCount % 2 === 0 && socket !== this.player1) {
+    if (this.board.turn() === "b" && user.userId !== this.player2UserId) {
       return;
     }
-    if (this.moveCount % 2 === 1 && socket !== this.player2) {
+
+    if (this.result) {
+      console.error(
+        `User ${user.userId} is making a move post game completion`
+      );
       return;
     }
+
+    const moveTimestamp = new Date(Date.now());
 
     try {
-      this.board.move(move);
-    } catch (error) {
-      console.log(error);
+      if (isPromoting(this.board, move.from, move.to)) {
+        this.board.move({
+          from: move.from,
+          to: move.to,
+          promotion: "q",
+        });
+      } else {
+        this.board.move({
+          from: move.from,
+          to: move.to,
+        });
+      }
+    } catch (e) {
+      console.error("Error while making move");
       return;
     }
 
-    // add move to db
-    await this.addMoveToDb(move);
+    // flipped because move has already happened
+    if (this.board.turn() === "b") {
+      this.player1TimeConsumed =
+        this.player1TimeConsumed +
+        (moveTimestamp.getTime() - this.lastMoveTime.getTime());
+    }
 
-    // Check if the game is over
+    if (this.board.turn() === "w") {
+      this.player2TimeConsumed =
+        this.player2TimeConsumed +
+        (moveTimestamp.getTime() - this.lastMoveTime.getTime());
+    }
+
+    await this.addMoveToDb(move, moveTimestamp);
+    this.resetAbandonTimer();
+    this.resetMoveTimer();
+
+    this.lastMoveTime = moveTimestamp;
+
+    SocketManager.getInstance().broadcast(
+      this.gameId,
+      JSON.stringify({
+        type: MOVE,
+        payload: {
+          move,
+          player1TimeConsumed: this.player1TimeConsumed,
+          player2TimeConsumed: this.player2TimeConsumed,
+        },
+      })
+    );
+
     if (this.board.isGameOver()) {
-      if (this.player1) {
-        this.player1.send(
-          JSON.stringify({
-            type: GAME_OVER,
-            payload: {
-              winner: this.board.turn() === "w" ? "black" : "white",
-            },
-          })
-        );
-      }
-      if (this.player2) {
-        this.player2.send(
-          JSON.stringify({
-            type: GAME_OVER,
-            payload: {
-              winner: this.board.turn() === "w" ? "black" : "white",
-            },
-          })
-        );
-      }
+      const result = this.board.isDraw()
+        ? "DRAW"
+        : this.board.turn() === "b"
+          ? "WHITE_WINS"
+          : "BLACK_WINS";
 
-      if (this.failedDbMoves.length > 0 && this.gameId) {
-        try {
-          await prisma.move.createMany({
-            data: this.failedDbMoves.map((move) => ({
-              gameId: this.gameId!,
-              ...move,
-            })),
-          });
-        } catch (error) {
-          console.error("Couldn't add games to the database", error);
-        }
-      }
-      return;
+      this.endGame("COMPLETED", result);
     }
 
-    // Send the update
-    if (this.moveCount % 2 === 0) {
-      if (this.player2) {
-        this.player2.send(
-          JSON.stringify({
-            type: MOVE,
-            payload: {
-              move,
-            },
-          })
-        );
-      }
-    } else {
-      if (this.player1) {
-        this.player1.send(
-          JSON.stringify({
-            type: MOVE,
-            payload: {
-              move,
-            },
-          })
-        );
-      }
-    }
     this.moveCount++;
+  }
+
+  getPlayer1TimeConsumed() {
+    if (this.board.turn() === "w") {
+      return (
+        this.player1TimeConsumed +
+        (new Date(Date.now()).getTime() - this.lastMoveTime.getTime())
+      );
+    }
+    return this.player1TimeConsumed;
+  }
+
+  getPlayer2TimeConsumed() {
+    if (this.board.turn() === "b") {
+      return (
+        this.player2TimeConsumed +
+        (new Date(Date.now()).getTime() - this.lastMoveTime.getTime())
+      );
+    }
+    return this.player2TimeConsumed;
+  }
+
+  async resetAbandonTimer() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+    }
+    this.timer = setTimeout(() => {
+      this.endGame(
+        "ABANDONED",
+        this.board.turn() === "b" ? "WHITE_WINS" : "BLACK_WINS"
+      );
+    }, 60 * 1000);
+  }
+
+  async resetMoveTimer() {
+    if (this.moveTimer) {
+      clearTimeout(this.moveTimer);
+    }
+    const turn = this.board.turn();
+    const timeLeft =
+      GAME_TIME_MS -
+      (turn === "w" ? this.player1TimeConsumed : this.player2TimeConsumed);
+
+    this.moveTimer = setTimeout(() => {
+      this.endGame("TIME_UP", turn === "b" ? "WHITE_WINS" : "BLACK_WINS");
+    }, timeLeft);
+  }
+
+  async endGame(status: GAME_STATUS, result: GAME_RESULT) {
+    const updatedGame = await prisma.game.update({
+      data: {
+        status,
+        result: result,
+      },
+      where: {
+        id: this.gameId,
+      },
+      include: {
+        moves: {
+          orderBy: {
+            moveNumber: "asc",
+          },
+        },
+        blackPlayer: true,
+        whitePlayer: true,
+      },
+    });
+
+    SocketManager.getInstance().broadcast(
+      this.gameId,
+      JSON.stringify({
+        type: GAME_ENDED,
+        payload: {
+          result,
+          status,
+          moves: updatedGame.moves,
+          blackPlayer: {
+            id: updatedGame.blackPlayer.id,
+            name: updatedGame.blackPlayer.name,
+          },
+          whitePlayer: {
+            id: updatedGame.whitePlayer.id,
+            name: updatedGame.whitePlayer.name,
+          },
+        },
+      })
+    );
+    // clear timers
+    this.clearTimer();
+    this.clearMoveTimer();
+  }
+
+  clearMoveTimer() {
+    if (this.moveTimer) clearTimeout(this.moveTimer);
+  }
+
+  setTimer(timer: NodeJS.Timeout) {
+    this.timer = timer;
+  }
+
+  clearTimer() {
+    if (this.timer) clearTimeout(this.timer);
   }
 }
