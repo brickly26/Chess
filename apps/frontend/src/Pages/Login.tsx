@@ -1,11 +1,16 @@
 import Google from "../assets/google.png";
 import Github from "../assets/github.png";
 import { useNavigate } from "react-router-dom";
+import { useRecoilState } from "recoil";
+import { userAtom } from "../../../../packages/store/src/atoms/user";
+import { useRef } from "react";
 
 const BACKEND_URL = "http://localhost:3000";
 
 const Login = () => {
   const router = useNavigate();
+  const guestName = useRef<HTMLInputElement>(null);
+  const [_, setUser] = useRecoilState(userAtom);
 
   const google = () => {
     window.open(`${BACKEND_URL}/auth/google`, "_self");
@@ -13,6 +18,22 @@ const Login = () => {
 
   const github = () => {
     window.open(`${BACKEND_URL}/auth/github`, "_self");
+  };
+
+  const loginAsGuest = async () => {
+    const response = await fetch(`${BACKEND_URL}/auth/guest`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        name: (guestName.current && guestName.current.value) || "",
+      }),
+    });
+    const user = await response.json();
+    setUser(user);
+    router("/game/random");
   };
 
   return (
@@ -55,7 +76,7 @@ const Login = () => {
           />
           <button
             className="bg-[#B48764] text-white w-full py-2 rounded-md hover:bg-[#bf9b80] transition-colors duration-300"
-            onClick={() => router("/game/random")}
+            onClick={() => loginAsGuest()}
           >
             Enter as guest
           </button>

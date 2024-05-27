@@ -3,6 +3,7 @@ import { GAME_ENDED, INIT_GAME, MOVE } from "./messages";
 import { prisma } from "./db";
 import { randomUUID } from "crypto";
 import { SocketManager, User } from "./SocketManager";
+import { AuthProvider } from "@prisma/client";
 
 type GAME_STATUS = "IN_PROGRESS" | "COMPLETED" | "ABANDONED" | "TIME_UP";
 type GAME_RESULT = "WHITE_WINS" | "BLACK_WINS" | "DRAW";
@@ -126,6 +127,9 @@ export class Game {
       return;
     }
 
+    let WhitePlayer = users.find((user) => user.id === this.player1UserId);
+    let BlackPlayer = users.find((user) => user.id === this.player2UserId);
+
     SocketManager.getInstance().broadcast(
       this.gameId,
       JSON.stringify({
@@ -133,11 +137,11 @@ export class Game {
         payload: {
           gameId: this.gameId,
           whitePlayer: {
-            name: users.find((user) => user.id === this.player1UserId)?.name,
+            name: WhitePlayer?.name,
             id: this.player1UserId,
           },
           blackPlayer: {
-            name: users.find((user) => user.id === this.player2UserId)?.name,
+            name: BlackPlayer?.name,
             id: this.player2UserId,
           },
           fen: this.board.fen(),

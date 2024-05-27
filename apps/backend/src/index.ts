@@ -4,20 +4,25 @@ import { initPassport } from "./passport";
 import passport from "passport";
 import dotenv from "dotenv";
 import session from "express-session";
+import cookieParser from "cookie-parser";
 
 import authRoute from "./router/auth";
 import v1Router from "./router/v1";
 
+export const COOKIE_MAX_AGE = 24 * 60 * 60 * 1000;
+
 const app = express();
 
 dotenv.config();
+
+app.use(express.json());
 
 app.use(
   session({
     secret: "keyboard cat",
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false, maxAge: 86400000 },
+    cookie: { secure: false, maxAge: COOKIE_MAX_AGE },
   })
 );
 

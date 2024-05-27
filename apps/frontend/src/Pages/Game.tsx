@@ -28,6 +28,12 @@ export const USER_TIMEOUT = "user_timeout";
 export const GAME_TIME = "game_time";
 export const GAME_ENDED = "game_ended";
 
+export interface Player {
+  id: string;
+  name: string;
+  isGuest: boolean;
+}
+
 export enum Result {
   WHITE_WINS = "WHITE_WINS",
   BLACK_WINS = "BLACK_WINS",
@@ -41,9 +47,9 @@ export interface GameResult {
 
 const GAME_TIME_MS = 10 * 60 * 1000;
 
-interface Metadata {
-  blackPlayer: { id: string; name: string };
-  whitePlayer: { id: string; name: string };
+export interface Metadata {
+  blackPlayer: Player;
+  whitePlayer: Player;
 }
 
 const moveAudio = new Audio(MoveSound);
@@ -249,13 +255,7 @@ const Game = () => {
                   <div className="mb-2">
                     {started && (
                       <div className="flex justify-between items-center  h-10 font-semibold">
-                        <UserAvatar
-                          name={
-                            user.id === gameMetadata?.whitePlayer?.id
-                              ? gameMetadata?.blackPlayer?.name
-                              : gameMetadata?.whitePlayer?.name ?? ""
-                          }
-                        />
+                        <UserAvatar gameMetadata={gameMetadata} self />
                         <div className="justify-center flex  text-white">
                           {(user.id === gameMetadata?.blackPlayer?.id
                             ? "b"
@@ -289,13 +289,7 @@ const Game = () => {
                   </div>
                   {started && (
                     <div className="mt- flex justify-between items-center mt-2 h-10 font-semibold">
-                      <UserAvatar
-                        name={
-                          user.id === gameMetadata?.blackPlayer?.id
-                            ? gameMetadata?.blackPlayer?.name
-                            : gameMetadata?.whitePlayer?.name ?? ""
-                        }
-                      />
+                      <UserAvatar gameMetadata={gameMetadata} self />
                       {getTimer(
                         user.id === gameMetadata?.blackPlayer?.id
                           ? player2TimeConsumed
