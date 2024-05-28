@@ -1,4 +1,6 @@
 //TODO: Make prettier
-export const Loader = () => {
+const Loader = () => {
   return <div>Loading..</div>;
 };
+
+export default Loader;
