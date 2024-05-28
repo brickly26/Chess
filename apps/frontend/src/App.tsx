@@ -5,7 +5,7 @@ import Landing from "./Pages/Landing";
 import Game from "./Pages/Game";
 import Login from "./Pages/Login";
 import { RecoilRoot } from "recoil";
-import Loader from "./components/Loader";
+import Loader from "./components/Loader.tsx";
 import { Layout } from "./layout";
 
 function App() {
