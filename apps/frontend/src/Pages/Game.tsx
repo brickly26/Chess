@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useRef, useState } from "react";
 import MoveSound from "/move.wav";
-import { Button } from "../components/Button";
+import Button from "../components/Button";
 import { isPromoting, ChessBoard } from "../components/ChessBoard";
 import { useSocket } from "../hooks/useSocket";
 import { Chess, Move } from "chess.js";
